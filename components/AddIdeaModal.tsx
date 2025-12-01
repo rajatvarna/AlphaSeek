@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StockIdea, SourceType } from '../types';
 import { X, Loader2 } from 'lucide-react';
-import { getCurrentPrice, getCompanyProfile } from '../services/stockService';
+import { stocksAPI } from '../services/apiClient';
 
 interface AddIdeaModalProps {
   isOpen: boolean;
@@ -31,17 +31,17 @@ const AddIdeaModal: React.FC<AddIdeaModalProps> = ({ isOpen, onClose, onAdd }) =
              setPriceLoading(true);
              setFetchedPrice(null);
              try {
-                 const profile = await getCompanyProfile(ticker);
-                 setCompanyName(profile.name);
-                 
-                 const price = await getCurrentPrice(ticker);
-                 setFetchedPrice(price);
-                 
+                 const stockData = await stocksAPI.getStockData(ticker);
+                 setCompanyName(stockData.companyName);
+                 setFetchedPrice(stockData.currentPrice);
+
                  // Pre-fill entry price only if it's currently empty
                  setEntryPrice(prev => {
-                     if (!prev) return price.toFixed(2);
+                     if (!prev) return stockData.currentPrice.toFixed(2);
                      return prev;
                  });
+             } catch (err) {
+                 console.error('Failed to fetch stock data:', err);
              } finally {
                  setPriceLoading(false);
              }

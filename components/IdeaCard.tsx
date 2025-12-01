@@ -161,6 +161,11 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
           <PerformanceBadge label="1W" value={performance['1W']} />
           <PerformanceBadge label="1M" value={performance['1M']} />
           <PerformanceBadge label="6M" value={performance['6M']} />
+          <PerformanceBadge label="1Y" value={performance['1Y']} />
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <PerformanceBadge label="3Y" value={performance['3Y']} />
+          <PerformanceBadge label="5Y" value={performance['5Y']} />
           <PerformanceBadge label="YTD" value={performance.YTD} />
         </div>
       </div>

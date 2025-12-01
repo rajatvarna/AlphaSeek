@@ -198,7 +198,7 @@ export const calculatePerformance = (
   const totalReturn = pct(entryPrice, currentPrice);
 
   if (!history || history.length === 0) {
-      return { '1W': 0, '1M': 0, '6M': 0, 'YTD': 0, '1Y': 0, 'Total': totalReturn };
+      return { '1W': 0, '1M': 0, '6M': 0, 'YTD': 0, '1Y': 0, '3Y': 0, '5Y': 0, 'Total': totalReturn };
   }
 
   const getPriceAtAgo = (daysAgo: number): number => {
@@ -223,6 +223,8 @@ export const calculatePerformance = (
     '6M': pct(getPriceAtAgo(180), currentPrice),
     'YTD': pct(ytdPrice, currentPrice),
     '1Y': pct(getPriceAtAgo(365), currentPrice),
+    '3Y': pct(getPriceAtAgo(365 * 3), currentPrice),
+    '5Y': pct(getPriceAtAgo(365 * 5), currentPrice),
     'Total': totalReturn,
   };
 };
