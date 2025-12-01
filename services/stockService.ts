@@ -1,59 +1,80 @@
 import { StockIdea, HistoricalDataPoint, PerformanceMetrics } from '../types';
 
-// We use a public CORS proxy to access Yahoo Finance API from the browser.
-// In a production environment, this should be handled by a backend proxy to protect keys and ensure stability.
-const CORS_PROXY = "https://corsproxy.io/?";
-const YAHOO_BASE_URL = "https://query1.finance.yahoo.com/v8/finance/chart/";
+// List of public CORS proxies to try in order.
+// Yahoo Finance can be picky, so rotating proxies helps reliability.
+const PROXIES = [
+    "https://corsproxy.io/?",
+    "https://api.allorigins.win/raw?url="
+];
+
+const YAHOO_BASE_URL = "https://query2.finance.yahoo.com/v8/finance/chart/";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-// Fallback prices if API fails
+// Updated Fallback prices (approximate values as of late 2024/early 2025)
 const FALLBACK_PRICES: Record<string, number> = {
-    'NVDA': 135.50, 'AAPL': 228.00, 'MSFT': 420.00, 'GOOG': 168.00,
-    'AMZN': 188.00, 'TSLA': 240.00, 'META': 520.00, 'NFLX': 680.00,
-    'AMD': 155.00, 'INTC': 21.00, 'PYPL': 63.00, 'GME': 22.00,
-    'AMC': 4.50, 'PLTR': 32.00, 'COIN': 170.00, 'HOOD': 19.00,
-    'SPY': 560.00, 'QQQ': 480.00, 'V': 275.00, 'MA': 450.00,
-    'JPM': 210.00, 'DIS': 95.00, 'BA': 170.00
+    'NVDA': 140.00, 'AAPL': 235.00, 'MSFT': 425.00, 'GOOG': 175.00,
+    'AMZN': 195.00, 'TSLA': 250.00, 'META': 530.00, 'NFLX': 700.00,
+    'AMD': 160.00, 'INTC': 23.00, 'PYPL': 84.00, 'GME': 25.00,
+    'AMC': 5.00, 'PLTR': 42.00, 'COIN': 180.00, 'HOOD': 22.00,
+    'SPY': 580.00, 'QQQ': 500.00, 'V': 285.00, 'MA': 460.00,
+    'JPM': 220.00, 'DIS': 100.00, 'BA': 160.00, 'CRM': 300.00,
+    'UBER': 75.00, 'ABNB': 140.00, 'SBUX': 95.00, 'NKE': 85.00
 };
 
-// Helper to fetch data from Yahoo
+// Helper to fetch data from Yahoo using rotated proxies
 const fetchYahooData = async (ticker: string): Promise<{ price: number, history: HistoricalDataPoint[] } | null> => {
-    try {
-        const symbol = ticker.toUpperCase();
-        const url = `${YAHOO_BASE_URL}${symbol}?interval=1d&range=5y`;
-        const proxiedUrl = `${CORS_PROXY}${encodeURIComponent(url)}`;
-        
-        const response = await fetch(proxiedUrl);
-        if (!response.ok) throw new Error('Network response was not ok');
-        
-        const data = await response.json();
-        const result = data.chart.result[0];
-        
-        if (!result) throw new Error('No data found');
+    const symbol = ticker.toUpperCase();
+    const targetUrl = `${YAHOO_BASE_URL}${symbol}?interval=1d&range=5y`;
 
-        const meta = result.meta;
-        const currentPrice = meta.regularMarketPrice;
-        
-        const timestamps = result.timestamp || [];
-        const quotes = result.indicators.quote[0].close || [];
-        
-        const history: HistoricalDataPoint[] = [];
-        
-        for (let i = 0; i < timestamps.length; i++) {
-            if (timestamps[i] && quotes[i] !== null && quotes[i] !== undefined) {
-                history.push({
-                    date: new Date(timestamps[i] * 1000).toISOString().split('T')[0],
-                    price: parseFloat(quotes[i].toFixed(2))
-                });
+    for (const proxy of PROXIES) {
+        try {
+            // Some proxies behave better with encoded URLs, others might need raw.
+            // Standard encodeURIComponent is safest for most.
+            const proxiedUrl = `${proxy}${encodeURIComponent(targetUrl)}`;
+            
+            const response = await fetch(proxiedUrl);
+            if (!response.ok) {
+                console.warn(`Proxy ${proxy} failed for ${symbol}: ${response.statusText}`);
+                continue; // Try next proxy
             }
+            
+            const data = await response.json();
+            
+            // Handle AllOrigins wrapper if it returns contents field (though we use raw param above)
+            const resultData = data.contents ? JSON.parse(data.contents) : data;
+            
+            const result = resultData.chart?.result?.[0];
+            
+            if (!result) throw new Error('Invalid data structure');
+
+            const meta = result.meta;
+            const currentPrice = meta.regularMarketPrice;
+            
+            const timestamps = result.timestamp || [];
+            const quotes = result.indicators.quote[0].close || [];
+            
+            const history: HistoricalDataPoint[] = [];
+            
+            for (let i = 0; i < timestamps.length; i++) {
+                if (timestamps[i] && quotes[i] !== null && quotes[i] !== undefined) {
+                    history.push({
+                        date: new Date(timestamps[i] * 1000).toISOString().split('T')[0],
+                        price: parseFloat(quotes[i].toFixed(2))
+                    });
+                }
+            }
+            
+            return { price: currentPrice, history };
+
+        } catch (error) {
+            console.warn(`Error fetching ${symbol} via ${proxy}:`, error);
+            // Continue to next proxy
         }
-        
-        return { price: currentPrice, history };
-    } catch (error) {
-        console.warn(`Failed to fetch data for ${ticker}, using fallback.`, error);
-        return null;
     }
+
+    console.error(`All proxies failed for ${symbol}. Using fallback.`);
+    return null;
 };
 
 // Deterministic random number generator for fallback mocks
@@ -75,10 +96,12 @@ const generateMockHistory = (ticker: string, currentPrice: number): HistoricalDa
             price: parseFloat(price.toFixed(2))
         });
         
+        // Reverse engineer "random walk" to create history
         const change = (seededRandom(seed + i) - 0.5) * 3;
         price = price / (1 + change / 100);
         if (price < 0.1) price = 0.1;
     }
+    // We generated backwards from Now -> Past, but array should be Oldest -> Newest
     return history.reverse();
 };
 
@@ -94,6 +117,9 @@ export const getStockHistory = async (ticker: string): Promise<HistoricalDataPoi
 };
 
 export const getCurrentPrice = async (ticker: string): Promise<number> => {
+    // If we already fetched data recently, we might have it, but for simplicity we fetch again
+    // or rely on the same internal caching if we implemented it.
+    // Ideally, we fetch once for both.
     const data = await fetchYahooData(ticker);
     if (data) {
         return data.price;
@@ -102,8 +128,7 @@ export const getCurrentPrice = async (ticker: string): Promise<number> => {
     const t = ticker.toUpperCase();
     if (FALLBACK_PRICES[t]) return FALLBACK_PRICES[t];
     
-    // Random fallback for unknown tickers if fetch fails
-    return 100;
+    return 100.00; // Generic default
 };
 
 export const getCompanyProfile = async (ticker: string): Promise<{ name: string }> => {
@@ -112,7 +137,12 @@ export const getCompanyProfile = async (ticker: string): Promise<{ name: string 
         'AMZN': 'Amazon.com Inc.', 'TSLA': 'Tesla, Inc.', 'NVDA': 'NVIDIA Corporation',
         'META': 'Meta Platforms, Inc.', 'GME': 'GameStop Corp.', 'AMC': 'AMC Entertainment',
         'PLTR': 'Palantir Technologies', 'PYPL': 'PayPal Holdings', 'NFLX': 'Netflix, Inc.',
-        'AMD': 'Advanced Micro Devices',
+        'AMD': 'Advanced Micro Devices', 'INTC': 'Intel Corporation', 'SPY': 'SPDR S&P 500 ETF',
+        'QQQ': 'Invesco QQQ Trust', 'V': 'Visa Inc.', 'MA': 'Mastercard Inc.',
+        'JPM': 'JPMorgan Chase & Co.', 'DIS': 'Walt Disney Company', 'BA': 'Boeing Company',
+        'COIN': 'Coinbase Global', 'HOOD': 'Robinhood Markets', 'CRM': 'Salesforce',
+        'UBER': 'Uber Technologies', 'ABNB': 'Airbnb, Inc.', 'SBUX': 'Starbucks Corp.',
+        'NKE': 'Nike, Inc.'
     };
     return { name: map[ticker.toUpperCase()] || `${ticker.toUpperCase()} Corp.` };
 }
