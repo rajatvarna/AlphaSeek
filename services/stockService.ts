@@ -4,7 +4,9 @@ import { StockIdea, HistoricalDataPoint, PerformanceMetrics } from '../types';
 // Yahoo Finance can be picky, so rotating proxies helps reliability.
 const PROXIES = [
     "https://corsproxy.io/?",
-    "https://api.allorigins.win/raw?url="
+    "https://api.allorigins.win/raw?url=",
+    "https://thingproxy.freeboard.io/fetch/",
+    "https://api.codetabs.com/v1/proxy?quest="
 ];
 
 const YAHOO_BASE_URL = "https://query2.finance.yahoo.com/v8/finance/chart/";
@@ -29,46 +31,69 @@ const fetchYahooData = async (ticker: string): Promise<{ price: number, history:
 
     for (const proxy of PROXIES) {
         try {
-            // Some proxies behave better with encoded URLs, others might need raw.
-            // Standard encodeURIComponent is safest for most.
-            const proxiedUrl = `${proxy}${encodeURIComponent(targetUrl)}`;
+            // Encode the target URL to ensure query parameters aren't lost by the proxy
+            const encodedUrl = encodeURIComponent(targetUrl);
+            const proxiedUrl = `${proxy}${encodedUrl}`;
             
-            const response = await fetch(proxiedUrl);
+            const response = await fetch(proxiedUrl, {
+                // simple headers to avoid preflight issues with some proxies
+                method: 'GET',
+            });
+            
             if (!response.ok) {
-                console.warn(`Proxy ${proxy} failed for ${symbol}: ${response.statusText}`);
+                // console.warn(`Proxy ${proxy} failed for ${symbol}: ${response.status} ${response.statusText}`);
                 continue; // Try next proxy
             }
             
-            const data = await response.json();
+            const text = await response.text();
+            if (!text || text.trim().startsWith('<')) {
+                 // HTML response usually means error page from proxy or Yahoo
+                 continue;
+            }
+
+            let data;
+            try {
+                // Handle AllOrigins wrapper if it returns contents field (it shouldn't with 'raw', but safety first)
+                const json = JSON.parse(text);
+                data = json.contents ? JSON.parse(json.contents) : json;
+            } catch (e) {
+                continue;
+            }
             
-            // Handle AllOrigins wrapper if it returns contents field (though we use raw param above)
-            const resultData = data.contents ? JSON.parse(data.contents) : data;
+            const result = data.chart?.result?.[0];
             
-            const result = resultData.chart?.result?.[0];
-            
-            if (!result) throw new Error('Invalid data structure');
+            if (!result) {
+                // Yahoo sometimes returns { chart: { error: ... } }
+                if (data.chart?.error) {
+                   console.warn(`Yahoo API Error for ${symbol}:`, data.chart.error);
+                }
+                continue;
+            }
 
             const meta = result.meta;
             const currentPrice = meta.regularMarketPrice;
             
             const timestamps = result.timestamp || [];
-            const quotes = result.indicators.quote[0].close || [];
+            const quote = result.indicators?.quote?.[0] || {};
+            const closes = quote.close || [];
             
             const history: HistoricalDataPoint[] = [];
             
             for (let i = 0; i < timestamps.length; i++) {
-                if (timestamps[i] && quotes[i] !== null && quotes[i] !== undefined) {
+                // Ensure we have a valid price and date
+                if (timestamps[i] && closes[i] !== null && closes[i] !== undefined) {
                     history.push({
                         date: new Date(timestamps[i] * 1000).toISOString().split('T')[0],
-                        price: parseFloat(quotes[i].toFixed(2))
+                        price: parseFloat(closes[i].toFixed(2))
                     });
                 }
             }
             
+            // console.log(`Success fetching ${symbol} via ${proxy}`);
             return { price: currentPrice, history };
 
         } catch (error) {
-            console.warn(`Error fetching ${symbol} via ${proxy}:`, error);
+            // console.warn(`Error fetching ${symbol} via ${proxy}:`, error);
             // Continue to next proxy
         }
     }
@@ -89,6 +114,8 @@ const generateMockHistory = (ticker: string, currentPrice: number): HistoricalDa
     let price = currentPrice;
     const seed = ticker.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
 
+    // Generate a slightly more realistic trend (e.g. general market drift) 
+    // rather than pure random walk to look better in UI if fallback is used.
     for (let i = 0; i < 365 * 5; i++) { // 5 years back
         const date = new Date(now - (i * ONE_DAY_MS));
         history.push({
@@ -96,9 +123,18 @@ const generateMockHistory = (ticker: string, currentPrice: number): HistoricalDa
             price: parseFloat(price.toFixed(2))
         });
         
-        // Reverse engineer "random walk" to create history
-        const change = (seededRandom(seed + i) - 0.5) * 3;
-        price = price / (1 + change / 100);
+        // Reverse engineer walk: 
+        // We want the "past" price. If current is 100, and yesterday was 99, change was +1%.
+        // So price(t-1) = price(t) / (1 + change)
+        
+        // Bias slightly positive over long term (stocks go up) -> means we divide by > 1 slightly more often going back?
+        // Actually, if we want graph to go UP from left to right, we need past prices to be lower.
+        // So going backwards, price should generally decrease (divide by > 1).
+        
+        const randomChange = (seededRandom(seed + i) - 0.45) * 2.5; // slight bias to 0.05 positive mean
+        const factor = 1 + (randomChange / 100);
+        
+        price = price / factor;
         if (price < 0.1) price = 0.1;
     }
     // We generated backwards from Now -> Past, but array should be Oldest -> Newest
@@ -154,9 +190,15 @@ export const calculatePerformance = (
   entryDate: string
 ): PerformanceMetrics => {
   
+  const pct = (start: number, end: number) => {
+      if (!start || start === 0) return 0;
+      return ((end - start) / start) * 100;
+  };
+
+  const totalReturn = pct(entryPrice, currentPrice);
+
   if (!history || history.length === 0) {
-      const fallbackPct = entryPrice > 0 ? ((currentPrice - entryPrice) / entryPrice) * 100 : 0;
-      return { '1W': 0, '1M': 0, '6M': 0, 'YTD': 0, '1Y': 0, 'Total': fallbackPct };
+      return { '1W': 0, '1M': 0, '6M': 0, 'YTD': 0, '1Y': 0, 'Total': totalReturn };
   }
 
   const getPriceAtAgo = (daysAgo: number): number => {
@@ -175,17 +217,12 @@ export const calculatePerformance = (
   const ytdPricePoint = history.find(p => p.date >= ytdDate);
   const ytdPrice = ytdPricePoint?.price ?? history[0].price;
 
-  const pct = (start: number, end: number) => {
-      if (!start || start === 0) return 0;
-      return ((end - start) / start) * 100;
-  };
-
   return {
     '1W': pct(getPriceAtAgo(7), currentPrice),
     '1M': pct(getPriceAtAgo(30), currentPrice),
     '6M': pct(getPriceAtAgo(180), currentPrice),
     'YTD': pct(ytdPrice, currentPrice),
     '1Y': pct(getPriceAtAgo(365), currentPrice),
-    'Total': pct(entryPrice, currentPrice),
+    'Total': totalReturn,
   };
 };
