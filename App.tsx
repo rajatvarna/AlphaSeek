@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { StockIdea, SourceType } from './types';
-import { getMockStockHistory, getCurrentPrice, calculatePerformance } from './services/stockService';
+import { getStockHistory, getCurrentPrice, calculatePerformance } from './services/stockService';
 import IdeaCard from './components/IdeaCard';
 import AddIdeaModal from './components/AddIdeaModal';
 import TagFilter from './components/TagFilter';
@@ -15,9 +15,9 @@ const INITIAL_IDEAS: StockIdea[] = [
         source: 'Hedge Fund Letter',
         sourceType: 'Hedge Fund',
         originalLink: 'https://example.com',
-        entryDate: '2023-05-15',
-        entryPrice: 280.00,
-        currentPrice: 460.12, // Will be updated by mock fetch
+        entryDate: '2023-11-15',
+        entryPrice: 48.00, // Pre-split adjusted rough estimate for demo
+        currentPrice: 135.50, 
         thesis: 'AI infrastructure buildout is just beginning. Data center revenue will triple over the next 2 years.',
         summary: 'Bullish on long-term AI infrastructure dominance. Expecting data center revenue to triple.',
         conviction: 'High',
@@ -29,9 +29,9 @@ const INITIAL_IDEAS: StockIdea[] = [
         companyName: 'PayPal Holdings',
         source: 'ValueInvestorsClub',
         sourceType: 'Blog',
-        entryDate: '2023-08-01',
-        entryPrice: 64.50,
-        currentPrice: 58.20,
+        entryDate: '2024-02-01',
+        entryPrice: 58.50,
+        currentPrice: 63.00,
         thesis: 'Market is pricing this as a dying business, but FCF yield is over 8%. New CEO will cut costs.',
         summary: 'Contrarian value play. Market pessimism overstated. Strong FCF yield and turnaround potential.',
         conviction: 'Medium',
@@ -52,20 +52,21 @@ export default function App() {
   // Initialize/Update prices on load
   useEffect(() => {
     const initData = async () => {
+        // Fetch current prices and history for initial ideas
         const updatedIdeas = await Promise.all(ideas.map(async (idea) => {
-             // Simulate "Live" price update
              const currentPrice = await getCurrentPrice(idea.ticker);
              return { ...idea, currentPrice };
         }));
         setIdeas(updatedIdeas);
 
-        // Populate history cache
+        // Populate history cache asynchronously
         const newCache: Record<string, any[]> = {};
-        updatedIdeas.forEach(idea => {
+        await Promise.all(updatedIdeas.map(async (idea) => {
             if (!historyCache[idea.ticker]) {
-                newCache[idea.ticker] = getMockStockHistory(idea.ticker, idea.entryDate);
+                const history = await getStockHistory(idea.ticker);
+                newCache[idea.ticker] = history;
             }
-        });
+        }));
         setHistoryCache(prev => ({...prev, ...newCache}));
     };
     initData();
@@ -81,9 +82,10 @@ export default function App() {
     };
     
     // Update cache for new ticker
+    const history = await getStockHistory(newIdea.ticker);
     setHistoryCache(prev => ({
         ...prev,
-        [newIdea.ticker]: getMockStockHistory(newIdea.ticker, newIdea.entryDate)
+        [newIdea.ticker]: history
     }));
 
     setIdeas(prev => [newIdea, ...prev]);
