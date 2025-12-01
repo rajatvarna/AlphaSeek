@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StockIdea, SourceType } from '../types';
-import { X, Sparkles, Loader2, Search } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 import { getCurrentPrice, getCompanyProfile } from '../services/stockService';
-import { summarizeThesis, extractTickerAndSentiment } from '../services/geminiService';
 
 interface AddIdeaModalProps {
   isOpen: boolean;
@@ -18,56 +17,48 @@ const AddIdeaModal: React.FC<AddIdeaModalProps> = ({ isOpen, onClose, onAdd }) =
   const [originalLink, setOriginalLink] = useState('');
   const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0]);
   const [entryPrice, setEntryPrice] = useState<string>('');
+  const [fetchedPrice, setFetchedPrice] = useState<number | null>(null);
   const [thesis, setThesis] = useState('');
   const [summary, setSummary] = useState('');
+  const [tagsInput, setTagsInput] = useState('');
   const [conviction, setConviction] = useState<'High' | 'Medium' | 'Low'>('Medium');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [priceLoading, setPriceLoading] = useState(false);
 
   useEffect(() => {
     if (ticker) {
         const fetchDetails = async () => {
              setPriceLoading(true);
+             setFetchedPrice(null);
              try {
                  const profile = await getCompanyProfile(ticker);
                  setCompanyName(profile.name);
+                 
                  const price = await getCurrentPrice(ticker);
-                 if (!entryPrice) setEntryPrice(price.toFixed(2));
+                 setFetchedPrice(price);
+                 
+                 // Pre-fill entry price only if it's currently empty
+                 setEntryPrice(prev => {
+                     if (!prev) return price.toFixed(2);
+                     return prev;
+                 });
              } finally {
                  setPriceLoading(false);
              }
         };
         const timeout = setTimeout(fetchDetails, 800);
         return () => clearTimeout(timeout);
+    } else {
+        setCompanyName('');
+        setFetchedPrice(null);
     }
   }, [ticker]);
-
-  const handleGenerateSummary = async () => {
-    if (!thesis) return;
-    setIsGenerating(true);
-    const result = await summarizeThesis(thesis, ticker || "the stock");
-    setSummary(result);
-    setIsGenerating(false);
-  };
-
-  const handleSmartExtract = async () => {
-      if (!thesis) return;
-      setIsGenerating(true);
-      const extraction = await extractTickerAndSentiment(thesis);
-      if (extraction) {
-          if (!ticker) setTicker(extraction.ticker);
-          if (!companyName) setCompanyName(extraction.companyName);
-      }
-      const result = await summarizeThesis(thesis, extraction?.ticker || "the stock");
-      setSummary(result);
-      setIsGenerating(false);
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
+      const tags = tagsInput.split(',').map(t => t.trim()).filter(Boolean);
       await onAdd({
         ticker: ticker.toUpperCase(),
         companyName,
@@ -79,13 +70,17 @@ const AddIdeaModal: React.FC<AddIdeaModalProps> = ({ isOpen, onClose, onAdd }) =
         thesis,
         summary,
         conviction,
-        tags: []
+        tags
       });
       onClose();
       // Reset form
       setTicker('');
       setThesis('');
       setSummary('');
+      setFetchedPrice(null);
+      setEntryPrice('');
+      setCompanyName('');
+      setTagsInput('');
     } catch (err) {
       console.error(err);
     } finally {
@@ -129,7 +124,14 @@ const AddIdeaModal: React.FC<AddIdeaModalProps> = ({ isOpen, onClose, onAdd }) =
                             </div>
                         )}
                     </div>
-                    {companyName && <p className="text-xs text-gray-500 mt-1">{companyName}</p>}
+                    <div className="flex flex-col mt-1">
+                        {companyName && <span className="text-xs text-gray-500">{companyName}</span>}
+                        {fetchedPrice !== null && (
+                            <span className="text-xs text-emerald-600 font-medium">
+                                Current Market Price: ${fetchedPrice.toFixed(2)}
+                            </span>
+                        )}
+                    </div>
                 </div>
 
                 <div>
@@ -215,19 +217,22 @@ const AddIdeaModal: React.FC<AddIdeaModalProps> = ({ isOpen, onClose, onAdd }) =
                 </div>
             </div>
 
-            {/* Thesis & AI */}
+             {/* Tags */}
+             <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tags</label>
+                <input
+                    type="text"
+                    value={tagsInput}
+                    onChange={(e) => setTagsInput(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    placeholder="Tech, Value, Spin-off (comma separated)"
+                />
+            </div>
+
+            {/* Thesis */}
             <div>
                 <div className="flex justify-between items-center mb-1">
                      <label className="block text-sm font-medium text-gray-700">Investment Thesis / Notes</label>
-                     <button
-                        type="button"
-                        onClick={handleSmartExtract}
-                        disabled={isGenerating || !thesis}
-                        className="text-xs flex items-center gap-1 text-purple-600 hover:text-purple-700 font-medium disabled:opacity-50"
-                     >
-                        {isGenerating ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                        Auto-Extract & Summarize
-                     </button>
                 </div>
                 <textarea
                     required
@@ -239,24 +244,19 @@ const AddIdeaModal: React.FC<AddIdeaModalProps> = ({ isOpen, onClose, onAdd }) =
                 ></textarea>
             </div>
 
+            {/* Summary */}
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                     Summary 
-                    <span className="text-xs font-normal text-gray-500 ml-2">(Auto-generated or Manual)</span>
                 </label>
                 <div className="relative">
                     <textarea
                         value={summary}
                         onChange={(e) => setSummary(e.target.value)}
                         rows={3}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-gray-50"
-                        placeholder="Click the AI button above to generate..."
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+                        placeholder="Brief summary of the idea..."
                     ></textarea>
-                     {isGenerating && (
-                        <div className="absolute inset-0 bg-white/50 flex items-center justify-center backdrop-blur-[1px]">
-                            <Loader2 className="animate-spin text-purple-600" />
-                        </div>
-                    )}
                 </div>
             </div>
 

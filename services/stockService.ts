@@ -13,7 +13,11 @@ const seededRandom = (seed: number) => {
 };
 
 export const getMockStockHistory = (ticker: string, startDate: string): HistoricalDataPoint[] => {
-  const start = new Date(startDate).getTime();
+  // Handle invalid dates gracefully
+  const startTimestamp = new Date(startDate).getTime();
+  if (isNaN(startTimestamp)) return [];
+
+  const start = startTimestamp;
   const now = new Date().getTime();
   const days = Math.floor((now - start) / ONE_DAY_MS);
   
@@ -23,7 +27,10 @@ export const getMockStockHistory = (ticker: string, startDate: string): Historic
   let currentPrice = 100 + (seed % 500); // Random starting price 100-600
   const history: HistoricalDataPoint[] = [];
 
-  for (let i = 0; i <= days + 365; i++) { // Generate a bit more history for context
+  // Protect against excessive loops if date is way in the past
+  const maxDays = Math.min(days + 365, 5000); 
+
+  for (let i = 0; i <= maxDays; i++) { 
      const date = new Date(start - (365 * ONE_DAY_MS) + (i * ONE_DAY_MS));
      if (date.getTime() > now) break;
 
@@ -47,7 +54,9 @@ export const getCurrentPrice = async (ticker: string): Promise<number> => {
     await new Promise(resolve => setTimeout(resolve, 500));
     // Return the last price from our consistent mock generator
     const history = getMockStockHistory(ticker, '2023-01-01'); // arbitrary start for price check
-    return history.length > 0 ? history[history.length - 1].price : 100;
+    const lastPoint = history[history.length - 1];
+    // Safe access in case history is empty
+    return lastPoint?.price ?? 100;
 };
 
 export const getCompanyProfile = async (ticker: string): Promise<{ name: string }> => {
@@ -92,15 +101,20 @@ export const calculatePerformance = (
       // Find closest date in history
       const sorted = [...history].reverse();
       const found = sorted.find(p => new Date(p.date) <= targetDate);
-      return found ? found.price : entryPrice;
+      return found?.price ?? entryPrice;
   };
   
   const ytdDate = new Date(new Date().getFullYear(), 0, 1);
   const ytdPricePoint = history.find(p => new Date(p.date) >= ytdDate);
-  // Safe access with fallback to first history point or entry price
-  const ytdPrice = ytdPricePoint ? ytdPricePoint.price : (history[0]?.price ?? entryPrice);
+  
+  // Robust safe access
+  const firstPrice = history[0]?.price ?? entryPrice;
+  const ytdPrice = ytdPricePoint?.price ?? firstPrice;
 
-  const pct = (start: number, end: number) => start === 0 ? 0 : ((end - start) / start) * 100;
+  const pct = (start: number, end: number) => {
+      if (!start || start === 0) return 0;
+      return ((end - start) / start) * 100;
+  };
 
   return {
     '1W': pct(getPriceAtAgo(7), currentPrice),

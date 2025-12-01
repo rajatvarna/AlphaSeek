@@ -3,7 +3,8 @@ import { StockIdea, SourceType } from './types';
 import { getMockStockHistory, getCurrentPrice, calculatePerformance } from './services/stockService';
 import IdeaCard from './components/IdeaCard';
 import AddIdeaModal from './components/AddIdeaModal';
-import { Plus, Search, Filter, LayoutGrid, List, Rocket } from 'lucide-react';
+import TagFilter from './components/TagFilter';
+import { Plus, Search, Filter, Rocket } from 'lucide-react';
 
 // Sample initial data
 const INITIAL_IDEAS: StockIdea[] = [
@@ -43,6 +44,7 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSource, setFilterSource] = useState<SourceType | 'All'>('All');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   
   // Cache for historical data to avoid re-generating on every render
   const [historyCache, setHistoryCache] = useState<Record<string, any[]>>({});
@@ -87,6 +89,12 @@ export default function App() {
     setIdeas(prev => [newIdea, ...prev]);
   };
 
+  const allTags = useMemo(() => {
+    const tags = new Set<string>();
+    ideas.forEach(idea => idea.tags.forEach(tag => tags.add(tag)));
+    return Array.from(tags).sort();
+  }, [ideas]);
+
   const filteredIdeas = useMemo(() => {
     return ideas.filter(idea => {
       const matchesSearch = 
@@ -96,9 +104,11 @@ export default function App() {
       
       const matchesFilter = filterSource === 'All' || idea.sourceType === filterSource;
       
-      return matchesSearch && matchesFilter;
+      const matchesTags = selectedTags.length === 0 || selectedTags.some(tag => idea.tags.includes(tag));
+      
+      return matchesSearch && matchesFilter && matchesTags;
     });
-  }, [ideas, searchTerm, filterSource]);
+  }, [ideas, searchTerm, filterSource, selectedTags]);
 
   return (
     <div className="min-h-screen bg-gray-50/50">
@@ -129,20 +139,28 @@ export default function App() {
         <div className="border-b border-gray-200 bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                 <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
-                    <div className="relative w-full sm:w-96">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <Search size={18} className="text-gray-400" />
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto items-center">
+                        <div className="relative w-full sm:w-80">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <Search size={18} className="text-gray-400" />
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="Search ticker, thesis, or source..."
+                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition duration-150 ease-in-out"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
                         </div>
-                        <input
-                            type="text"
-                            placeholder="Search ticker, thesis, or source..."
-                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition duration-150 ease-in-out"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                        <TagFilter 
+                            availableTags={allTags} 
+                            selectedTags={selectedTags} 
+                            onChange={setSelectedTags} 
                         />
                     </div>
-                    <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0">
-                        <Filter size={16} className="text-gray-400 mr-1" />
+                    
+                    <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 scrollbar-hide">
+                        <Filter size={16} className="text-gray-400 mr-1 flex-shrink-0" />
                         {(['All', 'Hedge Fund', 'X', 'Reddit', 'Blog', 'News', 'Other'] as const).map((type) => (
                             <button
                                 key={type}
@@ -178,7 +196,6 @@ export default function App() {
                             <div key={idea.id} className="h-full">
                                 <IdeaCard 
                                     idea={idea} 
-                                    history={history}
                                     performance={performance}
                                 />
                             </div>
@@ -192,7 +209,7 @@ export default function App() {
                     </div>
                     <h3 className="text-lg font-medium text-gray-900">No ideas found</h3>
                     <p className="text-gray-500 mt-1 max-w-sm">
-                        Try adjusting your search terms or filters, or add a new stock idea to get started.
+                        Try adjusting your search terms, filters or tags.
                     </p>
                 </div>
             )}
