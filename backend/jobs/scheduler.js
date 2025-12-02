@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const { updateAllPrices, isMarketOpen } = require('./priceUpdateJob');
 const { createBackup } = require('./backupJob');
+const { scrapeAll } = require('../services/scrapers/redditScraper');
 
 let isInitialized = false;
 
@@ -41,6 +42,12 @@ function initializeScheduler() {
         await createBackup();
     });
 
+    // Scrape Reddit every 6 hours
+    cron.schedule('0 */6 * * *', async () => {
+        console.log('[Scheduler] Running Reddit scrape');
+        await scrapeAll();
+    });
+
     // Run initial price update on startup (after 10 second delay)
     setTimeout(async () => {
         console.log('[Scheduler] Running initial price update...');
@@ -52,6 +59,7 @@ function initializeScheduler() {
     console.log('[Scheduler] - Price updates: Every 15 min during market hours');
     console.log('[Scheduler] - Pre-market update: 9:00 AM ET (Mon-Fri)');
     console.log('[Scheduler] - Post-market update: 4:15 PM ET (Mon-Fri)');
+    console.log('[Scheduler] - Reddit scraping: Every 6 hours');
     console.log('[Scheduler] - Daily backup: 2:00 AM');
 }
 

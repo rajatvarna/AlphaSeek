@@ -26,6 +26,8 @@ app.use('/api/ideas', require('./routes/ideas'));
 app.use('/api/stocks', require('./routes/stocks'));
 app.use('/api/batch', require('./routes/batch'));
 app.use('/api/alerts', require('./routes/alerts'));
+app.use('/api/scraper', require('./routes/scraper'));
+app.use('/api/export', require('./routes/export'));
 
 // Health check
 app.get('/api/health', (req, res) => {

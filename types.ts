@@ -1,5 +1,6 @@
 export type SourceType = 'Reddit' | 'X' | 'Hedge Fund' | 'Blog' | 'News' | 'Other';
 export type IdeaStatus = 'Active' | 'Watching' | 'Exited' | 'Stopped Out' | 'Archived' | 'Invalidated';
+export type PositionStatus = 'watching' | 'invested' | 'exited';
 
 export interface StockIdea {
   id: string;
@@ -16,6 +17,9 @@ export interface StockIdea {
   conviction: 'High' | 'Medium' | 'Low';
   tags: string[];
   status?: IdeaStatus;
+  positionStatus?: PositionStatus;
+  positionSize?: number;
+  costBasis?: number;
   exitDate?: string;
   exitPrice?: number;
   exitReason?: string;
