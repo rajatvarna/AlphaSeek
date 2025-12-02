@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const { initializeDatabase } = require('./database');
 const { initializeScheduler } = require('./jobs/scheduler');
+const { initializeEmailService } = require('./services/emailService');
 
 // Initialize database
 initializeDatabase();
@@ -28,6 +29,8 @@ app.use('/api/batch', require('./routes/batch'));
 app.use('/api/alerts', require('./routes/alerts'));
 app.use('/api/scraper', require('./routes/scraper'));
 app.use('/api/export', require('./routes/export'));
+app.use('/api/fundamentals', require('./routes/fundamentals'));
+app.use('/api/comments', require('./routes/comments'));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -49,12 +52,15 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`\n✓ AlphaSeek API server running on port ${PORT}`);
   console.log(`✓ API available at http://localhost:${PORT}/api`);
   console.log(`\nDefault credentials:`);
   console.log(`  Username: admin`);
   console.log(`  Password: admin123\n`);
+
+  // Initialize email service
+  await initializeEmailService();
 
   // Initialize background jobs after server starts
   initializeScheduler();

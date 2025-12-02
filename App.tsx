@@ -7,7 +7,7 @@ import AddIdeaModal from './components/AddIdeaModal';
 import TagFilter from './components/TagFilter';
 import LoginPage from './components/LoginPage';
 import PortfolioDashboard from './components/PortfolioDashboard';
-import { Plus, Search, Filter, Rocket, LogOut, User, Loader2, LayoutGrid, BarChart3 } from 'lucide-react';
+import { Plus, Search, Filter, Rocket, LogOut, User, Loader2, LayoutGrid, BarChart3, Moon, Sun } from 'lucide-react';
 
 type ViewMode = 'ideas' | 'analytics';
 
@@ -22,9 +22,27 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('ideas');
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('darkMode');
+    return saved ? JSON.parse(saved) : false;
+  });
 
   // Cache for historical data to avoid re-fetching
   const [historyCache, setHistoryCache] = useState<Record<string, HistoricalDataPoint[]>>({});
+
+  // Handle dark mode
+  useEffect(() => {
+    localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
+  const toggleDarkMode = () => {
+    setIsDarkMode(prev => !prev);
+  };
 
   // Load ideas on mount
   useEffect(() => {
@@ -191,26 +209,26 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
+    <div className="min-h-screen bg-gray-50/50 dark:bg-gray-900 transition-colors">
         {/* Navigation / Header */}
-        <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-200">
+        <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-200 dark:bg-gray-800/80 dark:border-gray-700">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center h-16">
                     <div className="flex items-center gap-2">
-                        <div className="bg-blue-600 p-1.5 rounded-lg text-white">
+                        <div className="bg-blue-600 p-1.5 rounded-lg text-white dark:bg-blue-500">
                             <Rocket size={20} />
                         </div>
-                        <h1 className="text-xl font-bold text-gray-900 tracking-tight">AlphaSeek</h1>
+                        <h1 className="text-xl font-bold text-gray-900 tracking-tight dark:text-white">AlphaSeek</h1>
                     </div>
                     <div className="flex items-center gap-4">
                         {/* View Mode Toggle */}
-                        <div className="hidden md:flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
+                        <div className="hidden md:flex items-center gap-2 bg-gray-100 p-1 rounded-lg dark:bg-gray-700">
                             <button
                                 onClick={() => setViewMode('ideas')}
                                 className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                                     viewMode === 'ideas'
-                                        ? 'bg-white text-gray-900 shadow-sm'
-                                        : 'text-gray-600 hover:text-gray-900'
+                                        ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-600 dark:text-white'
+                                        : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
                                 }`}
                             >
                                 <LayoutGrid size={16} />
@@ -220,8 +238,8 @@ export default function App() {
                                 onClick={() => setViewMode('analytics')}
                                 className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                                     viewMode === 'analytics'
-                                        ? 'bg-white text-gray-900 shadow-sm'
-                                        : 'text-gray-600 hover:text-gray-900'
+                                        ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-600 dark:text-white'
+                                        : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
                                 }`}
                             >
                                 <BarChart3 size={16} />
@@ -229,7 +247,7 @@ export default function App() {
                             </button>
                         </div>
 
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                             <User size={16} />
                             <span className="font-medium">{currentUser?.username}</span>
                             {currentUser?.role === 'admin' && (
@@ -241,15 +259,22 @@ export default function App() {
                         {authAPI.isAdmin() && viewMode === 'ideas' && (
                             <button
                                 onClick={() => setIsModalOpen(true)}
-                                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition-colors shadow-sm dark:bg-blue-600 dark:hover:bg-blue-700"
                             >
                                 <Plus size={16} />
                                 Add Idea
                             </button>
                         )}
                         <button
+                            onClick={toggleDarkMode}
+                            className="inline-flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 text-sm font-medium rounded-lg transition-colors dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700"
+                            title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+                        >
+                            {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
+                        </button>
+                        <button
                             onClick={handleLogout}
-                            className="inline-flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 text-sm font-medium rounded-lg transition-colors"
+                            className="inline-flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 text-sm font-medium rounded-lg transition-colors dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700"
                             title="Logout"
                         >
                             <LogOut size={16} />
@@ -261,7 +286,7 @@ export default function App() {
 
         {/* Filters Bar - Only show for ideas view */}
         {viewMode === 'ideas' && (
-        <div className="border-b border-gray-200 bg-white">
+        <div className="border-b border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                 <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto items-center">
@@ -272,7 +297,7 @@ export default function App() {
                             <input
                                 type="text"
                                 placeholder="Search ticker, thesis, or source..."
-                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition duration-150 ease-in-out"
+                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition duration-150 ease-in-out dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
@@ -292,8 +317,8 @@ export default function App() {
                                 onClick={() => setFilterSource(type)}
                                 className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border ${
                                     filterSource === type
-                                    ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                                    ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-800'
+                                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600'
                                 }`}
                             >
                                 {type}
