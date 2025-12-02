@@ -112,6 +112,47 @@ router.patch('/:id/price', authenticateToken, requireAdmin, (req, res) => {
   }
 });
 
+// Update idea status (admin only)
+router.patch('/:id/status', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const { status, exitDate, exitPrice, exitReason } = req.body;
+
+    if (!status) {
+      return res.status(400).json({ error: 'Status required' });
+    }
+
+    const validStatuses = ['Active', 'Watching', 'Exited', 'Stopped Out', 'Archived', 'Invalidated'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const existingIdea = stockIdeaOps.getById(req.params.id);
+    if (!existingIdea) {
+      return res.status(404).json({ error: 'Idea not found' });
+    }
+
+    // Calculate actual return if exiting
+    let actualReturn = null;
+    if (status === 'Exited' && exitPrice) {
+      actualReturn = ((exitPrice - existingIdea.entry_price) / existingIdea.entry_price) * 100;
+    }
+
+    // Update status in database
+    const db = require('../database').db;
+    db.prepare(`
+      UPDATE stock_ideas
+      SET status = ?, exit_date = ?, exit_price = ?, exit_reason = ?, actual_return = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(status, exitDate || null, exitPrice || null, exitReason || null, actualReturn, req.params.id);
+
+    const updatedIdea = stockIdeaOps.getById(req.params.id);
+    res.json(updatedIdea);
+  } catch (error) {
+    console.error('Error updating status:', error);
+    res.status(500).json({ error: 'Failed to update status' });
+  }
+});
+
 // Delete stock idea (admin only)
 router.delete('/:id', authenticateToken, requireAdmin, (req, res) => {
   try {

@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { initializeDatabase } = require('./database');
+const { initializeScheduler } = require('./jobs/scheduler');
 
 // Initialize database
 initializeDatabase();
@@ -23,6 +24,8 @@ app.use((req, res, next) => {
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/ideas', require('./routes/ideas'));
 app.use('/api/stocks', require('./routes/stocks'));
+app.use('/api/batch', require('./routes/batch'));
+app.use('/api/alerts', require('./routes/alerts'));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -50,6 +53,9 @@ app.listen(PORT, () => {
   console.log(`\nDefault credentials:`);
   console.log(`  Username: admin`);
   console.log(`  Password: admin123\n`);
+
+  // Initialize background jobs after server starts
+  initializeScheduler();
 });
 
 module.exports = app;

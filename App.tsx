@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { StockIdea, SourceType, HistoricalDataPoint } from './types';
+import { StockIdea, SourceType, HistoricalDataPoint, PerformanceMetrics } from './types';
 import { calculatePerformance } from './services/stockService';
 import { authAPI, ideasAPI, stocksAPI } from './services/apiClient';
 import IdeaCard from './components/IdeaCard';
 import AddIdeaModal from './components/AddIdeaModal';
 import TagFilter from './components/TagFilter';
 import LoginPage from './components/LoginPage';
-import { Plus, Search, Filter, Rocket, LogOut, User, Loader2 } from 'lucide-react';
+import PortfolioDashboard from './components/PortfolioDashboard';
+import { Plus, Search, Filter, Rocket, LogOut, User, Loader2, LayoutGrid, BarChart3 } from 'lucide-react';
+
+type ViewMode = 'ideas' | 'analytics';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(authAPI.isAuthenticated());
@@ -18,6 +21,7 @@ export default function App() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>('ideas');
 
   // Cache for historical data to avoid re-fetching
   const [historyCache, setHistoryCache] = useState<Record<string, HistoricalDataPoint[]>>({});
@@ -165,6 +169,22 @@ export default function App() {
     });
   }, [ideas, searchTerm, filterSource, selectedTags]);
 
+  // Create performance map for analytics
+  const performanceMap = useMemo(() => {
+    const map = new Map<string, PerformanceMetrics>();
+    ideas.forEach(idea => {
+      const history = historyCache[idea.ticker] || [];
+      const performance = calculatePerformance(
+        idea.entryPrice,
+        idea.currentPrice,
+        history,
+        idea.entryDate
+      );
+      map.set(idea.id, performance);
+    });
+    return map;
+  }, [ideas, historyCache]);
+
   // Show login page if not authenticated
   if (!isAuthenticated) {
     return <LoginPage onLoginSuccess={handleLoginSuccess} />;
@@ -183,6 +203,32 @@ export default function App() {
                         <h1 className="text-xl font-bold text-gray-900 tracking-tight">AlphaSeek</h1>
                     </div>
                     <div className="flex items-center gap-4">
+                        {/* View Mode Toggle */}
+                        <div className="hidden md:flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
+                            <button
+                                onClick={() => setViewMode('ideas')}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                                    viewMode === 'ideas'
+                                        ? 'bg-white text-gray-900 shadow-sm'
+                                        : 'text-gray-600 hover:text-gray-900'
+                                }`}
+                            >
+                                <LayoutGrid size={16} />
+                                Ideas
+                            </button>
+                            <button
+                                onClick={() => setViewMode('analytics')}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                                    viewMode === 'analytics'
+                                        ? 'bg-white text-gray-900 shadow-sm'
+                                        : 'text-gray-600 hover:text-gray-900'
+                                }`}
+                            >
+                                <BarChart3 size={16} />
+                                Analytics
+                            </button>
+                        </div>
+
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                             <User size={16} />
                             <span className="font-medium">{currentUser?.username}</span>
@@ -192,7 +238,7 @@ export default function App() {
                                 </span>
                             )}
                         </div>
-                        {authAPI.isAdmin() && (
+                        {authAPI.isAdmin() && viewMode === 'ideas' && (
                             <button
                                 onClick={() => setIsModalOpen(true)}
                                 className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
@@ -213,7 +259,8 @@ export default function App() {
             </div>
         </header>
 
-        {/* Filters Bar */}
+        {/* Filters Bar - Only show for ideas view */}
+        {viewMode === 'ideas' && (
         <div className="border-b border-gray-200 bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                 <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
@@ -256,10 +303,13 @@ export default function App() {
                 </div>
             </div>
         </div>
+        )}
 
-        {/* Main Grid */}
+        {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {isLoading ? (
+            {viewMode === 'analytics' ? (
+                <PortfolioDashboard ideas={ideas} performanceMap={performanceMap} />
+            ) : isLoading ? (
                 <div className="flex flex-col items-center justify-center py-20">
                     <Loader2 size={48} className="animate-spin text-blue-600 mb-4" />
                     <p className="text-gray-600">Loading ideas...</p>
