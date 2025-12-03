@@ -2,7 +2,6 @@
   "name": "alphaseek",
   "private": true,
   "version": "1.0.0",
-  "type": "module",
   "scripts": {
     "dev": "vite",
     "dev:server": "node backend/server.js",
@@ -16,7 +15,7 @@
     "better-sqlite3": "^11.7.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
-    "json2csv": "^6.0.0",
+    "@json2csv/plainjs": "^7.0.6",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.555.0",
     "node-cron": "^3.0.3",
