@@ -1,12 +1,19 @@
 import { StockIdea, HistoricalDataPoint, PerformanceMetrics } from '../types';
 
+// Definition for Proxy handling
+interface ProxyDef {
+    url: string;
+    isWrapper: boolean; // true if proxy returns { contents: "response_body", status: ... }
+}
+
 // List of public CORS proxies to try in order.
-// Yahoo Finance can be picky, so rotating proxies helps reliability.
-const PROXIES = [
-    "https://corsproxy.io/?",
-    "https://api.allorigins.win/raw?url=",
-    "https://thingproxy.freeboard.io/fetch/",
-    "https://api.codetabs.com/v1/proxy?quest="
+// Using 'get' for allorigins is often more reliable than 'raw' as it wraps the response
+// and avoids some content-type/header filtering issues.
+const PROXIES: ProxyDef[] = [
+    { url: "https://api.allorigins.win/get?url=", isWrapper: true },
+    { url: "https://corsproxy.io/?", isWrapper: false },
+    { url: "https://thingproxy.freeboard.io/fetch/", isWrapper: false },
+    { url: "https://api.codetabs.com/v1/proxy?quest=", isWrapper: false }
 ];
 
 const YAHOO_BASE_URL = "https://query2.finance.yahoo.com/v8/finance/chart/";
@@ -27,45 +34,61 @@ const FALLBACK_PRICES: Record<string, number> = {
 // Helper to fetch data from Yahoo using rotated proxies
 const fetchYahooData = async (ticker: string): Promise<{ price: number, history: HistoricalDataPoint[] } | null> => {
     const symbol = ticker.toUpperCase();
-    const targetUrl = `${YAHOO_BASE_URL}${symbol}?interval=1d&range=5y`;
+    // Add cache buster to prevent proxy caching of old data/errors
+    const cacheBuster = `&_cb=${Date.now()}`;
+    const targetUrl = `${YAHOO_BASE_URL}${symbol}?interval=1d&range=5y${cacheBuster}`;
+    const encodedUrl = encodeURIComponent(targetUrl);
 
     for (const proxy of PROXIES) {
         try {
-            // Encode the target URL to ensure query parameters aren't lost by the proxy
-            const encodedUrl = encodeURIComponent(targetUrl);
-            const proxiedUrl = `${proxy}${encodedUrl}`;
+            const proxiedUrl = `${proxy.url}${encodedUrl}`;
             
             const response = await fetch(proxiedUrl, {
-                // simple headers to avoid preflight issues with some proxies
                 method: 'GET',
             });
             
             if (!response.ok) {
-                // console.warn(`Proxy ${proxy} failed for ${symbol}: ${response.status} ${response.statusText}`);
-                continue; // Try next proxy
+                continue; 
             }
             
             const text = await response.text();
             if (!text || text.trim().startsWith('<')) {
-                 // HTML response usually means error page from proxy or Yahoo
                  continue;
             }
 
-            let data;
+            let json;
             try {
-                // Handle AllOrigins wrapper if it returns contents field (it shouldn't with 'raw', but safety first)
-                const json = JSON.parse(text);
-                data = json.contents ? JSON.parse(json.contents) : json;
+                json = JSON.parse(text);
             } catch (e) {
                 continue;
             }
-            
-            const result = data.chart?.result?.[0];
+
+            // Extract actual Yahoo response based on proxy type
+            let yahooData;
+            if (proxy.isWrapper) {
+                // For AllOrigins 'get' wrapper
+                if (json.contents) {
+                     // contents is a stringified JSON from Yahoo
+                     try {
+                        yahooData = JSON.parse(json.contents);
+                     } catch (e) {
+                        // Sometimes it returns the object directly if content-type was json
+                        yahooData = json.contents;
+                     }
+                } else {
+                    continue;
+                }
+            } else {
+                // Direct proxies return the body directly
+                yahooData = json;
+            }
+
+            // Validate structure
+            const result = yahooData?.chart?.result?.[0];
             
             if (!result) {
-                // Yahoo sometimes returns { chart: { error: ... } }
-                if (data.chart?.error) {
-                   console.warn(`Yahoo API Error for ${symbol}:`, data.chart.error);
+                if (yahooData?.chart?.error) {
+                   console.warn(`Yahoo API Error for ${symbol} via ${proxy.url}:`, yahooData.chart.error);
                 }
                 continue;
             }
@@ -89,16 +112,16 @@ const fetchYahooData = async (ticker: string): Promise<{ price: number, history:
                 }
             }
             
-            // console.log(`Success fetching ${symbol} via ${proxy}`);
+            // console.log(`Success fetching ${symbol} via ${proxy.url}`);
             return { price: currentPrice, history };
 
         } catch (error) {
-            // console.warn(`Error fetching ${symbol} via ${proxy}:`, error);
+            // console.warn(`Error fetching ${symbol} via ${proxy.url}:`, error);
             // Continue to next proxy
         }
     }
 
-    console.error(`All proxies failed for ${symbol}. Using fallback.`);
+    console.warn(`All proxies failed for ${symbol}. Using fallback.`);
     return null;
 };
 
@@ -124,13 +147,6 @@ const generateMockHistory = (ticker: string, currentPrice: number): HistoricalDa
         });
         
         // Reverse engineer walk: 
-        // We want the "past" price. If current is 100, and yesterday was 99, change was +1%.
-        // So price(t-1) = price(t) / (1 + change)
-        
-        // Bias slightly positive over long term (stocks go up) -> means we divide by > 1 slightly more often going back?
-        // Actually, if we want graph to go UP from left to right, we need past prices to be lower.
-        // So going backwards, price should generally decrease (divide by > 1).
-        
         const randomChange = (seededRandom(seed + i) - 0.45) * 2.5; // slight bias to 0.05 positive mean
         const factor = 1 + (randomChange / 100);
         
@@ -153,9 +169,6 @@ export const getStockHistory = async (ticker: string): Promise<HistoricalDataPoi
 };
 
 export const getCurrentPrice = async (ticker: string): Promise<number> => {
-    // If we already fetched data recently, we might have it, but for simplicity we fetch again
-    // or rely on the same internal caching if we implemented it.
-    // Ideally, we fetch once for both.
     const data = await fetchYahooData(ticker);
     if (data) {
         return data.price;
