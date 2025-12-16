@@ -169,6 +169,75 @@ export const stocksAPI = {
   }
 };
 
+// Scraper API
+export const scraperAPI = {
+  async getPendingIdeas() {
+    const response = await fetch(`${API_BASE_URL}/scraper/pending`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async triggerScrape(source: 'all' | 'reddit' | 'twitter' | 'rss' | 'vic' | 'news') {
+    const response = await fetch(`${API_BASE_URL}/scraper/scrape`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ source }),
+    });
+    return handleResponse(response);
+  },
+
+  async approveIdea(id: number) {
+    const response = await fetch(`${API_BASE_URL}/scraper/approve/${id}`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async rejectIdea(id: number) {
+    const response = await fetch(`${API_BASE_URL}/scraper/reject/${id}`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async getStats() {
+    const response = await fetch(`${API_BASE_URL}/scraper/stats`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  }
+};
+
+// Alerts API
+export const alertsAPI = {
+  async getAll() {
+    const response = await fetch(`${API_BASE_URL}/alerts`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async create(alertData: any) {
+    const response = await fetch(`${API_BASE_URL}/alerts`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(alertData),
+    });
+    return handleResponse(response);
+  },
+
+  async delete(id: number) {
+    const response = await fetch(`${API_BASE_URL}/alerts/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  }
+};
+
 // Initialize auth state on load
 const storedToken = localStorage.getItem('authToken');
 const storedUser = localStorage.getItem('currentUser');

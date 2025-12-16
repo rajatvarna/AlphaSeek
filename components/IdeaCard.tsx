@@ -1,10 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 import { StockIdea, PerformanceMetrics } from '../types';
-import { TrendingUp, TrendingDown, ExternalLink, BrainCircuit, Share2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, ExternalLink, BrainCircuit, Share2, Edit } from 'lucide-react';
 
 interface IdeaCardProps {
   idea: StockIdea;
   performance: PerformanceMetrics;
+  onEdit?: (idea: StockIdea) => void;
+  isAdmin?: boolean;
 }
 
 const PerformanceBadge = ({ label, value }: { label: string, value: number }) => {
@@ -64,7 +66,7 @@ const TradingViewWidget = ({ ticker }: { ticker: string }) => {
   return <div ref={container} className="w-full h-full" />;
 };
 
-const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
+const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance, onEdit, isAdmin }) => {
   const isProfitable = performance.Total >= 0;
 
   const handleShare = async () => {
@@ -114,14 +116,26 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
               </div>
               <p className="text-xs text-gray-400">Total Return</p>
             </div>
-            <button 
-                onClick={handleShare}
-                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
-                title="Share Idea"
-                aria-label="Share Idea"
-            >
-                <Share2 size={18} />
-            </button>
+            <div className="flex items-center gap-1">
+              {isAdmin && onEdit && (
+                <button
+                    onClick={() => onEdit(idea)}
+                    className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-full transition-colors"
+                    title="Edit Idea"
+                    aria-label="Edit Idea"
+                >
+                    <Edit size={18} />
+                </button>
+              )}
+              <button
+                  onClick={handleShare}
+                  className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                  title="Share Idea"
+                  aria-label="Share Idea"
+              >
+                  <Share2 size={18} />
+              </button>
+            </div>
         </div>
       </div>
 

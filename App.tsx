@@ -4,18 +4,22 @@ import { calculatePerformance } from './services/stockService';
 import { authAPI, ideasAPI, stocksAPI } from './services/apiClient';
 import IdeaCard from './components/IdeaCard';
 import AddIdeaModal from './components/AddIdeaModal';
+import EditIdeaModal from './components/EditIdeaModal';
 import TagFilter from './components/TagFilter';
 import LoginPage from './components/LoginPage';
 import PortfolioDashboard from './components/PortfolioDashboard';
-import { Plus, Search, Filter, Rocket, LogOut, User, Loader2, LayoutGrid, BarChart3, Moon, Sun } from 'lucide-react';
+import ScraperQueue from './components/ScraperQueue';
+import { Plus, Search, Filter, Rocket, LogOut, User, Loader2, LayoutGrid, BarChart3, Moon, Sun, Inbox } from 'lucide-react';
 
-type ViewMode = 'ideas' | 'analytics';
+type ViewMode = 'ideas' | 'analytics' | 'scraper';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(authAPI.isAuthenticated());
   const [currentUser, setCurrentUser] = useState(authAPI.getCurrentUserSync());
   const [ideas, setIdeas] = useState<StockIdea[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingIdea, setEditingIdea] = useState<StockIdea | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSource, setFilterSource] = useState<SourceType | 'All'>('All');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -96,6 +100,41 @@ export default function App() {
       setError(err.message || 'Failed to load ideas');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+
+  const handleEditIdea = (idea: StockIdea) => {
+    setEditingIdea(idea);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEdit = async (id: string, updatedData: Partial<StockIdea>) => {
+    try {
+      await ideasAPI.update(id, {
+        ticker: updatedData.ticker,
+        companyName: updatedData.companyName,
+        source: updatedData.source,
+        sourceType: updatedData.sourceType,
+        originalLink: updatedData.originalLink,
+        entryDate: updatedData.entryDate,
+        entryPrice: updatedData.entryPrice,
+        thesis: updatedData.thesis,
+        summary: updatedData.summary,
+        conviction: updatedData.conviction,
+        tags: updatedData.tags
+      });
+
+      setIdeas(prev => prev.map(idea =>
+        idea.id === id ? { ...idea, ...updatedData } : idea
+      ));
+
+      setIsEditModalOpen(false);
+      setEditingIdea(null);
+    } catch (err: any) {
+      console.error('Failed to update idea:', err);
+      alert(`Failed to update idea: ${err.message}`);
+      throw err;
     }
   };
 
@@ -245,6 +284,19 @@ export default function App() {
                                 <BarChart3 size={16} />
                                 Analytics
                             </button>
+                            {authAPI.isAdmin() && (
+                                <button
+                                    onClick={() => setViewMode('scraper')}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                                        viewMode === 'scraper'
+                                            ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-600 dark:text-white'
+                                            : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
+                                    }`}
+                                >
+                                    <Inbox size={16} />
+                                    Queue
+                                </button>
+                            )}
                         </div>
 
                         <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
@@ -332,7 +384,9 @@ export default function App() {
 
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {viewMode === 'analytics' ? (
+            {viewMode === 'scraper' ? (
+                <ScraperQueue />
+            ) : viewMode === 'analytics' ? (
                 <PortfolioDashboard ideas={ideas} performanceMap={performanceMap} />
             ) : isLoading ? (
                 <div className="flex flex-col items-center justify-center py-20">
@@ -369,6 +423,8 @@ export default function App() {
                                 <IdeaCard
                                     idea={idea}
                                     performance={performance}
+                                    onEdit={handleEditIdea}
+                                    isAdmin={authAPI.isAdmin()}
                                 />
                             </div>
                         );
@@ -394,6 +450,18 @@ export default function App() {
             onClose={() => setIsModalOpen(false)}
             onAdd={handleAddIdea}
         />
+
+        {editingIdea && (
+          <EditIdeaModal
+              isOpen={isEditModalOpen}
+              onClose={() => {
+                setIsEditModalOpen(false);
+                setEditingIdea(null);
+              }}
+              onSave={handleSaveEdit}
+              idea={editingIdea}
+          />
+        )}
     </div>
   );
 }
