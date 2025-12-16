@@ -1,7 +1,11 @@
 const cron = require('node-cron');
 const { updateAllPrices, isMarketOpen } = require('./priceUpdateJob');
 const { createBackup } = require('./backupJob');
-const { scrapeAll } = require('../services/scrapers/redditScraper');
+const redditScraper = require('../services/scrapers/redditScraper');
+const twitterScraper = require('../services/scrapers/twitterScraper');
+const rssFeedScraper = require('../services/scrapers/rssFeedScraper');
+const vicScraper = require('../services/scrapers/valueInvestorsClubScraper');
+const googleNewsScraper = require('../services/scrapers/googleNewsScraper');
 const { checkAlerts } = require('./alertCheckerJob');
 
 let isInitialized = false;
@@ -46,7 +50,31 @@ function initializeScheduler() {
     // Scrape Reddit every 6 hours
     cron.schedule('0 */6 * * *', async () => {
         console.log('[Scheduler] Running Reddit scrape');
-        await scrapeAll();
+        await redditScraper.scrapeAll();
+    });
+
+    // Scrape Twitter every 4 hours
+    cron.schedule('0 */4 * * *', async () => {
+        console.log('[Scheduler] Running Twitter scrape');
+        await twitterScraper.scrapeAll();
+    });
+
+    // Scrape RSS feeds (Substack, blogs) every 8 hours
+    cron.schedule('0 */8 * * *', async () => {
+        console.log('[Scheduler] Running RSS feed scrape');
+        await rssFeedScraper.scrapeAll();
+    });
+
+    // Scrape ValueInvestorsClub daily at 10 AM UTC
+    cron.schedule('0 10 * * *', async () => {
+        console.log('[Scheduler] Running ValueInvestorsClub scrape');
+        await vicScraper.scrapeAll();
+    });
+
+    // Scrape Google News every 3 hours
+    cron.schedule('0 */3 * * *', async () => {
+        console.log('[Scheduler] Running Google News scrape');
+        await googleNewsScraper.scrapeAll();
     });
 
     // Check price alerts every 5 minutes
@@ -67,6 +95,10 @@ function initializeScheduler() {
     console.log('[Scheduler] - Post-market update: 4:15 PM ET (Mon-Fri)');
     console.log('[Scheduler] - Alert checker: Every 5 minutes');
     console.log('[Scheduler] - Reddit scraping: Every 6 hours');
+    console.log('[Scheduler] - Twitter scraping: Every 4 hours');
+    console.log('[Scheduler] - RSS feed scraping: Every 8 hours');
+    console.log('[Scheduler] - Google News scraping: Every 3 hours');
+    console.log('[Scheduler] - ValueInvestorsClub scraping: Daily at 10 AM UTC');
     console.log('[Scheduler] - Daily backup: 2:00 AM');
 }
 

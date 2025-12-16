@@ -1,14 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
-const { scrapeAll, getPendingIdeas, approveIdea, rejectIdea } = require('../services/scrapers/redditScraper');
+const redditScraper = require('../services/scrapers/redditScraper');
+const twitterScraper = require('../services/scrapers/twitterScraper');
+const rssFeedScraper = require('../services/scrapers/rssFeedScraper');
+const vicScraper = require('../services/scrapers/valueInvestorsClubScraper');
+const googleNewsScraper = require('../services/scrapers/googleNewsScraper');
 const { stockIdeaOps } = require('../database');
 const { db } = require('../database');
 
 // Get pending scraped ideas (admin only)
 router.get('/pending', authenticateToken, requireAdmin, (req, res) => {
   try {
-    const pending = getPendingIdeas();
+    const pending = redditScraper.getPendingIdeas();
     res.json(pending);
   } catch (error) {
     console.error('Error fetching pending ideas:', error);
@@ -20,14 +24,41 @@ router.get('/pending', authenticateToken, requireAdmin, (req, res) => {
 router.post('/scrape', authenticateToken, requireAdmin, async (req, res) => {
   try {
     console.log(`[Scraper API] Manual scrape triggered by ${req.user.username}`);
+    const source = req.body.source || 'all';
 
-    // Run scraper in background
-    scrapeAll().catch(err => {
-      console.error('[Scraper API] Scrape error:', err);
-    });
+    // Run scrapers in background based on source
+    if (source === 'all' || source === 'reddit') {
+      redditScraper.scrapeAll().catch(err => {
+        console.error('[Scraper API] Reddit scrape error:', err);
+      });
+    }
+
+    if (source === 'all' || source === 'twitter') {
+      twitterScraper.scrapeAll().catch(err => {
+        console.error('[Scraper API] Twitter scrape error:', err);
+      });
+    }
+
+    if (source === 'all' || source === 'rss') {
+      rssFeedScraper.scrapeAll().catch(err => {
+        console.error('[Scraper API] RSS scrape error:', err);
+      });
+    }
+
+    if (source === 'all' || source === 'vic') {
+      vicScraper.scrapeAll().catch(err => {
+        console.error('[Scraper API] VIC scrape error:', err);
+      });
+    }
+
+    if (source === 'all' || source === 'news') {
+      googleNewsScraper.scrapeAll().catch(err => {
+        console.error('[Scraper API] Google News scrape error:', err);
+      });
+    }
 
     res.json({
-      message: 'Scraping started',
+      message: `Scraping started for: ${source}`,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -72,7 +103,7 @@ router.post('/approve/:id', authenticateToken, requireAdmin, async (req, res) =>
     }, req.user.id);
 
     // Mark as approved
-    approveIdea(req.params.id);
+    redditScraper.approveIdea(req.params.id);
 
     const newIdea = stockIdeaOps.getById(ideaId);
     res.status(201).json({
@@ -94,7 +125,7 @@ router.post('/reject/:id', authenticateToken, requireAdmin, (req, res) => {
       return res.status(404).json({ error: 'Scraped idea not found' });
     }
 
-    rejectIdea(req.params.id);
+    redditScraper.rejectIdea(req.params.id);
 
     res.json({ message: 'Idea rejected' });
   } catch (error) {
