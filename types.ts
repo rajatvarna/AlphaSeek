@@ -24,6 +24,11 @@ export interface StockIdea {
   exitPrice?: number;
   exitReason?: string;
   actualReturn?: number;
+  rating?: number; // 1-5 stars
+  ratingNotes?: string;
+  stopLossPrice?: number;
+  profitTargetPrice?: number;
+  trailingStopPct?: number;
 }
 
 export interface HistoricalDataPoint {

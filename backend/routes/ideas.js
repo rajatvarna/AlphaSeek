@@ -180,4 +180,66 @@ router.get('/meta/tags', authenticateToken, (req, res) => {
   }
 });
 
+// Check for duplicate ticker
+router.get('/check-duplicate/:ticker', authenticateToken, (req, res) => {
+  try {
+    const existingIdeas = stockIdeaOps.checkDuplicate(req.params.ticker);
+    res.json({
+      exists: existingIdeas.length > 0,
+      ideas: existingIdeas
+    });
+  } catch (error) {
+    console.error('Error checking duplicate:', error);
+    res.status(500).json({ error: 'Failed to check duplicate' });
+  }
+});
+
+// Update idea rating
+router.patch('/:id/rating', authenticateToken, (req, res) => {
+  try {
+    const { rating, ratingNotes } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+    }
+
+    const existingIdea = stockIdeaOps.getById(req.params.id);
+    if (!existingIdea) {
+      return res.status(404).json({ error: 'Idea not found' });
+    }
+
+    stockIdeaOps.updateRating(req.params.id, rating, ratingNotes || null);
+    const updatedIdea = stockIdeaOps.getById(req.params.id);
+    res.json(updatedIdea);
+  } catch (error) {
+    console.error('Error updating rating:', error);
+    res.status(500).json({ error: 'Failed to update rating' });
+  }
+});
+
+// Update exit strategy
+router.patch('/:id/exit-strategy', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const { stopLossPrice, profitTargetPrice, trailingStopPct } = req.body;
+
+    const existingIdea = stockIdeaOps.getById(req.params.id);
+    if (!existingIdea) {
+      return res.status(404).json({ error: 'Idea not found' });
+    }
+
+    stockIdeaOps.updateExitStrategy(
+      req.params.id,
+      stopLossPrice || null,
+      profitTargetPrice || null,
+      trailingStopPct || null
+    );
+
+    const updatedIdea = stockIdeaOps.getById(req.params.id);
+    res.json(updatedIdea);
+  } catch (error) {
+    console.error('Error updating exit strategy:', error);
+    res.status(500).json({ error: 'Failed to update exit strategy' });
+  }
+});
+
 module.exports = router;

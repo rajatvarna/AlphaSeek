@@ -149,6 +149,31 @@ export const ideasAPI = {
       headers: getAuthHeaders(),
     });
     return handleResponse(response);
+  },
+
+  async checkDuplicate(ticker: string) {
+    const response = await fetch(`${API_BASE_URL}/ideas/check-duplicate/${ticker}`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async updateRating(id: string, rating: number, ratingNotes?: string) {
+    const response = await fetch(`${API_BASE_URL}/ideas/${id}/rating`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ rating, ratingNotes }),
+    });
+    return handleResponse(response);
+  },
+
+  async updateExitStrategy(id: string, stopLossPrice?: number, profitTargetPrice?: number, trailingStopPct?: number) {
+    const response = await fetch(`${API_BASE_URL}/ideas/${id}/exit-strategy`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ stopLossPrice, profitTargetPrice, trailingStopPct }),
+    });
+    return handleResponse(response);
   }
 };
 

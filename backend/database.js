@@ -41,6 +41,11 @@ function initializeDatabase() {
       exit_price REAL,
       exit_reason TEXT,
       actual_return REAL,
+      rating INTEGER CHECK(rating >= 1 AND rating <= 5),
+      rating_notes TEXT,
+      stop_loss_price REAL,
+      profit_target_price REAL,
+      trailing_stop_pct REAL,
       created_by INTEGER NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -97,6 +102,42 @@ function initializeDatabase() {
   }
 
   console.log('✓ Database initialized successfully');
+
+  // Add new columns if they don't exist (migration)
+  try {
+    db.exec(`ALTER TABLE stock_ideas ADD COLUMN rating INTEGER CHECK(rating >= 1 AND rating <= 5)`);
+    console.log('✓ Added rating column');
+  } catch (e) {
+    // Column already exists
+  }
+
+  try {
+    db.exec(`ALTER TABLE stock_ideas ADD COLUMN rating_notes TEXT`);
+    console.log('✓ Added rating_notes column');
+  } catch (e) {
+    // Column already exists
+  }
+
+  try {
+    db.exec(`ALTER TABLE stock_ideas ADD COLUMN stop_loss_price REAL`);
+    console.log('✓ Added stop_loss_price column');
+  } catch (e) {
+    // Column already exists
+  }
+
+  try {
+    db.exec(`ALTER TABLE stock_ideas ADD COLUMN profit_target_price REAL`);
+    console.log('✓ Added profit_target_price column');
+  } catch (e) {
+    // Column already exists
+  }
+
+  try {
+    db.exec(`ALTER TABLE stock_ideas ADD COLUMN trailing_stop_pct REAL`);
+    console.log('✓ Added trailing_stop_pct column');
+  } catch (e) {
+    // Column already exists
+  }
 }
 
 // Helper function to hash passwords
@@ -232,6 +273,32 @@ const stockIdeaOps = {
 
   getAllTags: () => {
     return db.prepare('SELECT DISTINCT name FROM tags ORDER BY name').all().map(t => t.name);
+  },
+
+  checkDuplicate: (ticker) => {
+    const existing = db.prepare(`
+      SELECT id, ticker, company_name, entry_date, status
+      FROM stock_ideas
+      WHERE UPPER(ticker) = UPPER(?)
+      ORDER BY created_at DESC
+    `).all(ticker);
+    return existing;
+  },
+
+  updateRating: (id, rating, ratingNotes) => {
+    return db.prepare(`
+      UPDATE stock_ideas
+      SET rating = ?, rating_notes = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(rating, ratingNotes, id);
+  },
+
+  updateExitStrategy: (id, stopLossPrice, profitTargetPrice, trailingStopPct) => {
+    return db.prepare(`
+      UPDATE stock_ideas
+      SET stop_loss_price = ?, profit_target_price = ?, trailing_stop_pct = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(stopLossPrice, profitTargetPrice, trailingStopPct, id);
   }
 };
 

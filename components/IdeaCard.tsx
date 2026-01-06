@@ -1,6 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StockIdea, PerformanceMetrics } from '../types';
-import { TrendingUp, TrendingDown, ExternalLink, BrainCircuit, Share2, Edit } from 'lucide-react';
+import { TrendingUp, TrendingDown, ExternalLink, BrainCircuit, Share2, Edit, Target } from 'lucide-react';
+import StarRating from './StarRating';
+import ExitStrategyModal from './ExitStrategyModal';
 
 interface IdeaCardProps {
   idea: StockIdea;
@@ -68,6 +70,12 @@ const TradingViewWidget = ({ ticker }: { ticker: string }) => {
 
 const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance, onEdit, isAdmin }) => {
   const isProfitable = performance.Total >= 0;
+  const [isExitStrategyOpen, setIsExitStrategyOpen] = useState(false);
+  const [localIdea, setLocalIdea] = useState(idea);
+
+  const handleExitStrategyUpdate = (updated: StockIdea) => {
+    setLocalIdea(updated);
+  };
 
   const handleShare = async () => {
     const shareData: ShareData = {
@@ -94,6 +102,7 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance, onEdit, isAdmin 
   };
 
   return (
+    <>
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200 overflow-hidden flex flex-col h-full">
       {/* Header */}
       <div className="p-5 border-b border-gray-50 flex justify-between items-start bg-gradient-to-r from-gray-50 to-white">
@@ -170,6 +179,60 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance, onEdit, isAdmin 
             <TradingViewWidget ticker={idea.ticker} />
         </div>
 
+        {/* Rating */}
+        <div className="border-t border-gray-100 pt-3">
+          <StarRating
+            ideaId={localIdea.id}
+            currentRating={localIdea.rating}
+            currentNotes={localIdea.ratingNotes}
+            onRatingUpdate={(rating, notes) => setLocalIdea({...localIdea, rating, ratingNotes: notes})}
+          />
+        </div>
+
+        {/* Exit Strategy */}
+        {(localIdea.stopLossPrice || localIdea.profitTargetPrice || localIdea.trailingStopPct || isAdmin) && (
+          <div className="border-t border-gray-100 pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Exit Strategy</h4>
+              {isAdmin && (
+                <button
+                  onClick={() => setIsExitStrategyOpen(true)}
+                  className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                >
+                  <Target size={12} />
+                  {localIdea.stopLossPrice || localIdea.profitTargetPrice ? 'Edit' : 'Set'}
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {localIdea.stopLossPrice && (
+                <div className="bg-red-50 p-2 rounded border border-red-100">
+                  <div className="text-red-600 font-medium">Stop Loss</div>
+                  <div className="text-red-900 font-bold">${localIdea.stopLossPrice.toFixed(2)}</div>
+                  <div className="text-red-600 text-[10px]">
+                    {(((localIdea.stopLossPrice - localIdea.currentPrice) / localIdea.currentPrice) * 100).toFixed(1)}%
+                  </div>
+                </div>
+              )}
+              {localIdea.profitTargetPrice && (
+                <div className="bg-green-50 p-2 rounded border border-green-100">
+                  <div className="text-green-600 font-medium">Target</div>
+                  <div className="text-green-900 font-bold">${localIdea.profitTargetPrice.toFixed(2)}</div>
+                  <div className="text-green-600 text-[10px]">
+                    +{(((localIdea.profitTargetPrice - localIdea.currentPrice) / localIdea.currentPrice) * 100).toFixed(1)}%
+                  </div>
+                </div>
+              )}
+              {localIdea.trailingStopPct && (
+                <div className="bg-orange-50 p-2 rounded border border-orange-100 col-span-2">
+                  <div className="text-orange-600 font-medium">Trailing Stop</div>
+                  <div className="text-orange-900 font-bold">{localIdea.trailingStopPct}%</div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Metrics Grid */}
         <div className="grid grid-cols-4 gap-2 mt-auto">
           <PerformanceBadge label="1W" value={performance['1W']} />
@@ -201,6 +264,15 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance, onEdit, isAdmin 
          )}
       </div>
     </div>
+
+      {/* Exit Strategy Modal */}
+      <ExitStrategyModal
+        isOpen={isExitStrategyOpen}
+        onClose={() => setIsExitStrategyOpen(false)}
+        idea={localIdea}
+        onUpdate={handleExitStrategyUpdate}
+      />
+    </>
   );
 };
 
