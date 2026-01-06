@@ -8,6 +8,8 @@ import EditIdeaModal from './components/EditIdeaModal';
 import TagFilter from './components/TagFilter';
 import LoginPage from './components/LoginPage';
 import PortfolioDashboard from './components/PortfolioDashboard';
+import PerformanceDashboard from './components/PerformanceDashboard';
+import EarningsCalendar from './components/EarningsCalendar';
 import ScraperQueue from './components/ScraperQueue';
 import { Plus, Search, Filter, Rocket, LogOut, User, Loader2, LayoutGrid, BarChart3, Moon, Sun, Inbox } from 'lucide-react';
 
@@ -387,7 +389,10 @@ export default function App() {
             {viewMode === 'scraper' ? (
                 <ScraperQueue />
             ) : viewMode === 'analytics' ? (
-                <PortfolioDashboard ideas={ideas} performanceMap={performanceMap} />
+                <div className="space-y-8">
+                    <PerformanceDashboard />
+                    <EarningsCalendar daysAhead={30} />
+                </div>
             ) : isLoading ? (
                 <div className="flex flex-col items-center justify-center py-20">
                     <Loader2 size={48} className="animate-spin text-blue-600 mb-4" />
