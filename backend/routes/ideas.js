@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { stockIdeaOps } = require('../database');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { fetchTickerNews } = require('../services/newsService');
 
 // Get all stock ideas (public - all users can view)
 router.get('/', authenticateToken, (req, res) => {
@@ -239,6 +240,28 @@ router.patch('/:id/exit-strategy', authenticateToken, requireAdmin, (req, res) =
   } catch (error) {
     console.error('Error updating exit strategy:', error);
     res.status(500).json({ error: 'Failed to update exit strategy' });
+  }
+});
+
+// Get news for a specific ticker
+router.get('/:id/news', authenticateToken, async (req, res) => {
+  try {
+    const idea = stockIdeaOps.getById(req.params.id);
+    if (!idea) {
+      return res.status(404).json({ error: 'Idea not found' });
+    }
+
+    const limit = parseInt(req.query.limit) || 20;
+    const news = await fetchTickerNews(idea.ticker, idea.company_name, limit);
+
+    res.json({
+      ticker: idea.ticker,
+      companyName: idea.company_name,
+      articles: news
+    });
+  } catch (error) {
+    console.error('Error fetching news:', error);
+    res.status(500).json({ error: 'Failed to fetch news' });
   }
 });
 

@@ -29,6 +29,9 @@ export interface StockIdea {
   stopLossPrice?: number;
   profitTargetPrice?: number;
   trailingStopPct?: number;
+  nextEarningsDate?: string;
+  nextEarningsDateRaw?: number;
+  estimatedEPS?: number;
 }
 
 export interface HistoricalDataPoint {

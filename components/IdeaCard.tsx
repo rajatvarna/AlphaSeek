@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StockIdea, PerformanceMetrics } from '../types';
-import { TrendingUp, TrendingDown, ExternalLink, BrainCircuit, Share2, Edit, Target } from 'lucide-react';
+import { TrendingUp, TrendingDown, ExternalLink, BrainCircuit, Share2, Edit, Target, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
 import StarRating from './StarRating';
 import ExitStrategyModal from './ExitStrategyModal';
+import NewsFeed from './NewsFeed';
 
 interface IdeaCardProps {
   idea: StockIdea;
@@ -71,10 +72,34 @@ const TradingViewWidget = ({ ticker }: { ticker: string }) => {
 const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance, onEdit, isAdmin }) => {
   const isProfitable = performance.Total >= 0;
   const [isExitStrategyOpen, setIsExitStrategyOpen] = useState(false);
+  const [showNewsFeed, setShowNewsFeed] = useState(false);
   const [localIdea, setLocalIdea] = useState(idea);
 
   const handleExitStrategyUpdate = (updated: StockIdea) => {
     setLocalIdea(updated);
+  };
+
+  const getEarningsDaysUntil = () => {
+    if (!localIdea.nextEarningsDate) return null;
+    const earningsDate = new Date(localIdea.nextEarningsDate);
+    const today = new Date();
+    const diffTime = earningsDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  const formatEarningsDate = () => {
+    if (!localIdea.nextEarningsDate) return null;
+    const daysUntil = getEarningsDaysUntil();
+    if (daysUntil === null) return null;
+
+    if (daysUntil === 0) return 'Today';
+    if (daysUntil === 1) return 'Tomorrow';
+    if (daysUntil < 0) return 'Past';
+    if (daysUntil <= 7) return `${daysUntil}d`;
+
+    const date = new Date(localIdea.nextEarningsDate);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
   const handleShare = async () => {
@@ -113,6 +138,17 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance, onEdit, isAdmin 
             {idea.conviction === 'High' && (
                 <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full font-medium flex items-center gap-1">
                     <BrainCircuit size={10} /> High Conviction
+                </span>
+            )}
+            {localIdea.nextEarningsDate && getEarningsDaysUntil() !== null && getEarningsDaysUntil()! >= 0 && getEarningsDaysUntil()! <= 14 && (
+                <span className={`px-2 py-0.5 text-xs rounded-full font-medium flex items-center gap-1 ${
+                  getEarningsDaysUntil()! <= 3
+                    ? 'bg-red-100 text-red-800'
+                    : getEarningsDaysUntil()! <= 7
+                    ? 'bg-orange-100 text-orange-800'
+                    : 'bg-blue-100 text-blue-800'
+                }`}>
+                    <Calendar size={10} /> Earnings: {formatEarningsDate()}
                 </span>
             )}
           </div>
@@ -232,6 +268,28 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance, onEdit, isAdmin 
             </div>
           </div>
         )}
+
+        {/* News Feed Section */}
+        <div className="border-t border-gray-100 pt-3">
+          <button
+            onClick={() => setShowNewsFeed(!showNewsFeed)}
+            className="w-full flex items-center justify-between text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-700 transition-colors"
+          >
+            <span>Latest News</span>
+            {showNewsFeed ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+          {showNewsFeed && (
+            <div className="mt-3">
+              <NewsFeed
+                ideaId={localIdea.id}
+                ticker={localIdea.ticker}
+                companyName={localIdea.companyName}
+                limit={5}
+                compact={true}
+              />
+            </div>
+          )}
+        </div>
 
         {/* Metrics Grid */}
         <div className="grid grid-cols-4 gap-2 mt-auto">

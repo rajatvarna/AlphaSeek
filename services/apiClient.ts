@@ -174,6 +174,13 @@ export const ideasAPI = {
       body: JSON.stringify({ stopLossPrice, profitTargetPrice, trailingStopPct }),
     });
     return handleResponse(response);
+  },
+
+  async getNews(id: string, limit: number = 20) {
+    const response = await fetch(`${API_BASE_URL}/ideas/${id}/news?limit=${limit}`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
   }
 };
 
@@ -230,6 +237,46 @@ export const scraperAPI = {
 
   async getStats() {
     const response = await fetch(`${API_BASE_URL}/scraper/stats`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  }
+};
+
+// Earnings API
+export const earningsAPI = {
+  async getForIdea(id: string) {
+    const response = await fetch(`${API_BASE_URL}/earnings/idea/${id}`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async getCalendar() {
+    const response = await fetch(`${API_BASE_URL}/earnings/calendar`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async getUpcoming(days: number = 30) {
+    const response = await fetch(`${API_BASE_URL}/earnings/upcoming?days=${days}`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async refreshForIdea(id: string) {
+    const response = await fetch(`${API_BASE_URL}/earnings/idea/${id}/refresh`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async refreshAll() {
+    const response = await fetch(`${API_BASE_URL}/earnings/refresh-all`, {
+      method: 'POST',
       headers: getAuthHeaders(),
     });
     return handleResponse(response);

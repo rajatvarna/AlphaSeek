@@ -138,6 +138,27 @@ function initializeDatabase() {
   } catch (e) {
     // Column already exists
   }
+
+  try {
+    db.exec(`ALTER TABLE stock_ideas ADD COLUMN next_earnings_date TEXT`);
+    console.log('✓ Added next_earnings_date column');
+  } catch (e) {
+    // Column already exists
+  }
+
+  try {
+    db.exec(`ALTER TABLE stock_ideas ADD COLUMN next_earnings_date_raw INTEGER`);
+    console.log('✓ Added next_earnings_date_raw column');
+  } catch (e) {
+    // Column already exists
+  }
+
+  try {
+    db.exec(`ALTER TABLE stock_ideas ADD COLUMN estimated_eps REAL`);
+    console.log('✓ Added estimated_eps column');
+  } catch (e) {
+    // Column already exists
+  }
 }
 
 // Helper function to hash passwords
@@ -299,6 +320,29 @@ const stockIdeaOps = {
       SET stop_loss_price = ?, profit_target_price = ?, trailing_stop_pct = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(stopLossPrice, profitTargetPrice, trailingStopPct, id);
+  },
+
+  updateEarnings: (id, nextEarningsDate, nextEarningsDateRaw, estimatedEPS) => {
+    return db.prepare(`
+      UPDATE stock_ideas
+      SET next_earnings_date = ?, next_earnings_date_raw = ?, estimated_eps = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(nextEarningsDate, nextEarningsDateRaw, estimatedEPS, id);
+  },
+
+  getUpcomingEarnings: (withinDays = 30) => {
+    const now = Math.floor(Date.now() / 1000); // Current Unix timestamp
+    const future = now + (withinDays * 24 * 60 * 60); // Unix timestamp for N days from now
+
+    return db.prepare(`
+      SELECT id, ticker, company_name, next_earnings_date, next_earnings_date_raw, estimated_eps, status
+      FROM stock_ideas
+      WHERE next_earnings_date_raw IS NOT NULL
+        AND next_earnings_date_raw >= ?
+        AND next_earnings_date_raw <= ?
+        AND status = 'Active'
+      ORDER BY next_earnings_date_raw ASC
+    `).all(now, future);
   }
 };
 
