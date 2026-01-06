@@ -283,6 +283,30 @@ export const earningsAPI = {
   }
 };
 
+// Analytics API
+export const analyticsAPI = {
+  async getPerformance() {
+    const response = await fetch(`${API_BASE_URL}/analytics/performance`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async getSectors() {
+    const response = await fetch(`${API_BASE_URL}/analytics/sectors`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async getSummary() {
+    const response = await fetch(`${API_BASE_URL}/analytics/summary`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  }
+};
+
 // Alerts API
 export const alertsAPI = {
   async getAll() {

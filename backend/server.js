@@ -32,6 +32,7 @@ app.use('/api/export', require('./routes/export'));
 app.use('/api/fundamentals', require('./routes/fundamentals'));
 app.use('/api/comments', require('./routes/comments'));
 app.use('/api/earnings', require('./routes/earnings'));
+app.use('/api/analytics', require('./routes/analytics'));
 
 // Health check
 app.get('/api/health', (req, res) => {
