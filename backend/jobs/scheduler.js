@@ -1,5 +1,7 @@
 const cron = require('node-cron');
 const { updateAllPrices, isMarketOpen } = require('./priceUpdateJob');
+const { updateAllEarnings, updateUpcomingEarnings } = require('./earningsUpdateJob');
+const { checkEarningsAlerts } = require('./earningsAlertJob');
 const { createBackup } = require('./backupJob');
 const redditScraper = require('../services/scrapers/redditScraper');
 const twitterScraper = require('../services/scrapers/twitterScraper');
@@ -82,10 +84,30 @@ function initializeScheduler() {
         await checkAlerts();
     });
 
-    // Run initial price update on startup (after 10 second delay)
+    // Update all earnings data weekly (Sunday at 3 AM UTC)
+    cron.schedule('0 3 * * 0', async () => {
+        console.log('[Scheduler] Running weekly earnings update');
+        await updateAllEarnings();
+    });
+
+    // Update upcoming earnings daily at 6 AM UTC
+    cron.schedule('0 6 * * *', async () => {
+        console.log('[Scheduler] Running daily earnings update for upcoming earnings');
+        await updateUpcomingEarnings();
+    });
+
+    // Check earnings alerts twice daily (8 AM and 5 PM UTC)
+    cron.schedule('0 8,17 * * *', async () => {
+        console.log('[Scheduler] Checking earnings alerts');
+        await checkEarningsAlerts();
+    });
+
+    // Run initial updates on startup (after 10 second delay)
     setTimeout(async () => {
         console.log('[Scheduler] Running initial price update...');
         await updateAllPrices();
+        console.log('[Scheduler] Running initial earnings update...');
+        await updateUpcomingEarnings();
     }, 10000);
 
     isInitialized = true;
@@ -93,7 +115,10 @@ function initializeScheduler() {
     console.log('[Scheduler] - Price updates: Every 15 min during market hours');
     console.log('[Scheduler] - Pre-market update: 9:00 AM ET (Mon-Fri)');
     console.log('[Scheduler] - Post-market update: 4:15 PM ET (Mon-Fri)');
-    console.log('[Scheduler] - Alert checker: Every 5 minutes');
+    console.log('[Scheduler] - Price/Exit strategy alerts: Every 5 minutes');
+    console.log('[Scheduler] - Earnings update (all): Weekly on Sunday at 3 AM UTC');
+    console.log('[Scheduler] - Earnings update (upcoming): Daily at 6 AM UTC');
+    console.log('[Scheduler] - Earnings alerts: Twice daily (8 AM and 5 PM UTC)');
     console.log('[Scheduler] - Reddit scraping: Every 6 hours');
     console.log('[Scheduler] - Twitter scraping: Every 4 hours');
     console.log('[Scheduler] - RSS feed scraping: Every 8 hours');
