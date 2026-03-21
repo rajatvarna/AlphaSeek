@@ -1,210 +1,103 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { StockIdea, SourceType, HistoricalDataPoint, PerformanceMetrics } from './types';
-import { calculatePerformance } from './services/stockService';
-import { authAPI, ideasAPI, stocksAPI } from './services/apiClient';
+import { StockIdea, SourceType } from './types';
+import { getStockHistory, getCurrentPrice, calculatePerformance, getCompanyProfile } from './services/stockService';
 import IdeaCard from './components/IdeaCard';
 import AddIdeaModal from './components/AddIdeaModal';
-import EditIdeaModal from './components/EditIdeaModal';
 import TagFilter from './components/TagFilter';
-import LoginPage from './components/LoginPage';
-import PortfolioDashboard from './components/PortfolioDashboard';
-import PerformanceDashboard from './components/PerformanceDashboard';
-import EarningsCalendar from './components/EarningsCalendar';
-import ScraperQueue from './components/ScraperQueue';
-import { Plus, Search, Filter, Rocket, LogOut, User, Loader2, LayoutGrid, BarChart3, Moon, Sun, Inbox } from 'lucide-react';
+import { Plus, Search, Filter, Rocket, ArrowUpDown } from 'lucide-react';
 
-type ViewMode = 'ideas' | 'analytics' | 'scraper';
+type SortOption = 'conviction' | 'entryDate' | 'return';
+
+// Sample initial data
+const INITIAL_IDEAS: StockIdea[] = [
+    {
+        id: '1',
+        ticker: 'NVDA',
+        companyName: 'NVIDIA Corporation',
+        source: 'Hedge Fund Letter',
+        sourceType: 'Hedge Fund',
+        originalLink: 'https://example.com',
+        entryDate: '2023-11-15',
+        entryPrice: 48.00, // Pre-split adjusted rough estimate for demo
+        currentPrice: 135.50, 
+        thesis: 'AI infrastructure buildout is just beginning. Data center revenue will triple over the next 2 years.',
+        summary: 'Bullish on long-term AI infrastructure dominance. Expecting data center revenue to triple.',
+        conviction: 'High',
+        tags: ['AI', 'Semi']
+    },
+    {
+        id: '2',
+        ticker: 'PYPL',
+        companyName: 'PayPal Holdings',
+        source: 'ValueInvestorsClub',
+        sourceType: 'Blog',
+        entryDate: '2024-02-01',
+        entryPrice: 58.50,
+        currentPrice: 63.00,
+        thesis: 'Market is pricing this as a dying business, but FCF yield is over 8%. New CEO will cut costs.',
+        summary: 'Contrarian value play. Market pessimism overstated. Strong FCF yield and turnaround potential.',
+        conviction: 'Medium',
+        tags: ['Value', 'Fintech']
+    }
+];
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(authAPI.isAuthenticated());
-  const [currentUser, setCurrentUser] = useState(authAPI.getCurrentUserSync());
-  const [ideas, setIdeas] = useState<StockIdea[]>([]);
+  const [ideas, setIdeas] = useState<StockIdea[]>(INITIAL_IDEAS);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingIdea, setEditingIdea] = useState<StockIdea | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSource, setFilterSource] = useState<SourceType | 'All'>('All');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('ideas');
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    return saved ? JSON.parse(saved) : false;
-  });
+  const [sortBy, setSortBy] = useState<SortOption>('entryDate');
+  
+  // Cache for historical data to avoid re-generating on every render
+  const [historyCache, setHistoryCache] = useState<Record<string, any[]>>({});
 
-  // Cache for historical data to avoid re-fetching
-  const [historyCache, setHistoryCache] = useState<Record<string, HistoricalDataPoint[]>>({});
-
-  // Handle dark mode
+  // Initialize/Update prices on load
   useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode]);
+    const initData = async () => {
+        // Fetch current prices and history for initial ideas
+        const updatedIdeas = await Promise.all(ideas.map(async (idea) => {
+             const currentPrice = await getCurrentPrice(idea.ticker);
+             let description = idea.description;
+             if (!description) {
+                 // Try to fetch description if missing
+                 const profile = await getCompanyProfile(idea.ticker);
+                 description = profile.description;
+             }
+             return { ...idea, currentPrice, description };
+        }));
+        setIdeas(updatedIdeas);
 
-  const toggleDarkMode = () => {
-    setIsDarkMode(prev => !prev);
-  };
-
-  // Load ideas on mount
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadIdeas();
-    }
-  }, [isAuthenticated]);
-
-  const loadIdeas = async () => {
-    setIsLoading(true);
-    setError('');
-
-    try {
-      const fetchedIdeas = await ideasAPI.getAll();
-
-      // Convert database format to frontend format
-      const formattedIdeas: StockIdea[] = fetchedIdeas.map((idea: any) => ({
-        id: idea.id.toString(),
-        ticker: idea.ticker,
-        companyName: idea.company_name,
-        source: idea.source,
-        sourceType: idea.source_type,
-        originalLink: idea.original_link,
-        entryDate: idea.entry_date,
-        entryPrice: idea.entry_price,
-        currentPrice: idea.current_price,
-        thesis: idea.thesis,
-        summary: idea.summary,
-        conviction: idea.conviction,
-        tags: idea.tags
-      }));
-
-      setIdeas(formattedIdeas);
-
-      // Populate history cache for all tickers
-      const newCache: Record<string, HistoricalDataPoint[]> = {};
-      await Promise.all(formattedIdeas.map(async (idea) => {
-        if (!historyCache[idea.ticker]) {
-          try {
-            const stockData = await stocksAPI.getStockData(idea.ticker);
-            newCache[idea.ticker] = stockData.history;
-          } catch (err) {
-            console.error(`Failed to fetch history for ${idea.ticker}`, err);
-          }
-        }
-      }));
-      setHistoryCache(prev => ({...prev, ...newCache}));
-
-    } catch (err: any) {
-      console.error('Failed to load ideas:', err);
-      setError(err.message || 'Failed to load ideas');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-
-  const handleEditIdea = (idea: StockIdea) => {
-    setEditingIdea(idea);
-    setIsEditModalOpen(true);
-  };
-
-  const handleSaveEdit = async (id: string, updatedData: Partial<StockIdea>) => {
-    try {
-      await ideasAPI.update(id, {
-        ticker: updatedData.ticker,
-        companyName: updatedData.companyName,
-        source: updatedData.source,
-        sourceType: updatedData.sourceType,
-        originalLink: updatedData.originalLink,
-        entryDate: updatedData.entryDate,
-        entryPrice: updatedData.entryPrice,
-        thesis: updatedData.thesis,
-        summary: updatedData.summary,
-        conviction: updatedData.conviction,
-        tags: updatedData.tags
-      });
-
-      setIdeas(prev => prev.map(idea =>
-        idea.id === id ? { ...idea, ...updatedData } : idea
-      ));
-
-      setIsEditModalOpen(false);
-      setEditingIdea(null);
-    } catch (err: any) {
-      console.error('Failed to update idea:', err);
-      alert(`Failed to update idea: ${err.message}`);
-      throw err;
-    }
-  };
+        // Populate history cache asynchronously
+        const newCache: Record<string, any[]> = {};
+        await Promise.all(updatedIdeas.map(async (idea) => {
+            if (!historyCache[idea.ticker]) {
+                const history = await getStockHistory(idea.ticker);
+                newCache[idea.ticker] = history;
+            }
+        }));
+        setHistoryCache(prev => ({...prev, ...newCache}));
+    };
+    initData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
 
   const handleAddIdea = async (newIdeaPart: Omit<StockIdea, 'id' | 'currentPrice'>) => {
-    try {
-      // Get current price from API
-      const stockData = await stocksAPI.getStockData(newIdeaPart.ticker);
-
-      // Create idea through API
-      const createdIdea = await ideasAPI.create({
-        ticker: newIdeaPart.ticker.toUpperCase(),
-        companyName: newIdeaPart.companyName,
-        source: newIdeaPart.source,
-        sourceType: newIdeaPart.sourceType,
-        originalLink: newIdeaPart.originalLink,
-        entryDate: newIdeaPart.entryDate,
-        entryPrice: newIdeaPart.entryPrice,
-        currentPrice: stockData.currentPrice,
-        thesis: newIdeaPart.thesis,
-        summary: newIdeaPart.summary,
-        conviction: newIdeaPart.conviction,
-        tags: newIdeaPart.tags
-      });
-
-      // Convert to frontend format
-      const newIdea: StockIdea = {
-        id: createdIdea.id.toString(),
-        ticker: createdIdea.ticker,
-        companyName: createdIdea.company_name,
-        source: createdIdea.source,
-        sourceType: createdIdea.source_type,
-        originalLink: createdIdea.original_link,
-        entryDate: createdIdea.entry_date,
-        entryPrice: createdIdea.entry_price,
-        currentPrice: createdIdea.current_price,
-        thesis: createdIdea.thesis,
-        summary: createdIdea.summary,
-        conviction: createdIdea.conviction,
-        tags: createdIdea.tags
-      };
-
-      // Update cache for new ticker
-      setHistoryCache(prev => ({
+    const currentPrice = await getCurrentPrice(newIdeaPart.ticker);
+    const newIdea: StockIdea = {
+        ...newIdeaPart,
+        id: Date.now().toString(),
+        currentPrice
+    };
+    
+    // Update cache for new ticker
+    const history = await getStockHistory(newIdea.ticker);
+    setHistoryCache(prev => ({
         ...prev,
-        [newIdea.ticker]: stockData.history
-      }));
+        [newIdea.ticker]: history
+    }));
 
-      // Add to list
-      setIdeas(prev => [newIdea, ...prev]);
-
-    } catch (err: any) {
-      console.error('Failed to add idea:', err);
-      alert(`Failed to add idea: ${err.message}`);
-    }
-  };
-
-  const handleLogout = () => {
-    authAPI.logout();
-    setIsAuthenticated(false);
-    setCurrentUser(null);
-    setIdeas([]);
-    setHistoryCache({});
-  };
-
-  const handleLoginSuccess = async () => {
-    setIsAuthenticated(true);
-    const user = await authAPI.getCurrentUser();
-    setCurrentUser(user);
+    setIdeas(prev => [newIdea, ...prev]);
   };
 
   const allTags = useMemo(() => {
@@ -214,133 +107,63 @@ export default function App() {
   }, [ideas]);
 
   const filteredIdeas = useMemo(() => {
-    return ideas.filter(idea => {
-      const matchesSearch =
+    const filtered = ideas.filter(idea => {
+      const matchesSearch = 
         idea.ticker.toLowerCase().includes(searchTerm.toLowerCase()) ||
         idea.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         idea.summary.toLowerCase().includes(searchTerm.toLowerCase());
-
+      
       const matchesFilter = filterSource === 'All' || idea.sourceType === filterSource;
-
+      
       const matchesTags = selectedTags.length === 0 || selectedTags.some(tag => idea.tags.includes(tag));
-
+      
       return matchesSearch && matchesFilter && matchesTags;
     });
-  }, [ideas, searchTerm, filterSource, selectedTags]);
 
-  // Create performance map for analytics
-  const performanceMap = useMemo(() => {
-    const map = new Map<string, PerformanceMetrics>();
-    ideas.forEach(idea => {
-      const history = historyCache[idea.ticker] || [];
-      const performance = calculatePerformance(
-        idea.entryPrice,
-        idea.currentPrice,
-        history,
-        idea.entryDate
-      );
-      map.set(idea.id, performance);
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'conviction') {
+        const priority = { 'High': 3, 'Medium': 2, 'Low': 1 };
+        return priority[b.conviction] - priority[a.conviction];
+      }
+      if (sortBy === 'entryDate') {
+        return new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime();
+      }
+      if (sortBy === 'return') {
+        const returnA = ((a.currentPrice - a.entryPrice) / a.entryPrice);
+        const returnB = ((b.currentPrice - b.entryPrice) / b.entryPrice);
+        return returnB - returnA;
+      }
+      return 0;
     });
-    return map;
-  }, [ideas, historyCache]);
-
-  // Show login page if not authenticated
-  if (!isAuthenticated) {
-    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
-  }
+  }, [ideas, searchTerm, filterSource, selectedTags, sortBy]);
 
   return (
-    <div className="min-h-screen bg-gray-50/50 dark:bg-gray-900 transition-colors">
+    <div className="min-h-screen bg-gray-50/50">
         {/* Navigation / Header */}
-        <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-200 dark:bg-gray-800/80 dark:border-gray-700">
+        <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-200">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center h-16">
                     <div className="flex items-center gap-2">
-                        <div className="bg-blue-600 p-1.5 rounded-lg text-white dark:bg-blue-500">
+                        <div className="bg-blue-600 p-1.5 rounded-lg text-white">
                             <Rocket size={20} />
                         </div>
-                        <h1 className="text-xl font-bold text-gray-900 tracking-tight dark:text-white">AlphaSeek</h1>
+                        <h1 className="text-xl font-bold text-gray-900 tracking-tight">AlphaSeek</h1>
                     </div>
                     <div className="flex items-center gap-4">
-                        {/* View Mode Toggle */}
-                        <div className="hidden md:flex items-center gap-2 bg-gray-100 p-1 rounded-lg dark:bg-gray-700">
-                            <button
-                                onClick={() => setViewMode('ideas')}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                                    viewMode === 'ideas'
-                                        ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-600 dark:text-white'
-                                        : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
-                                }`}
-                            >
-                                <LayoutGrid size={16} />
-                                Ideas
-                            </button>
-                            <button
-                                onClick={() => setViewMode('analytics')}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                                    viewMode === 'analytics'
-                                        ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-600 dark:text-white'
-                                        : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
-                                }`}
-                            >
-                                <BarChart3 size={16} />
-                                Analytics
-                            </button>
-                            {authAPI.isAdmin() && (
-                                <button
-                                    onClick={() => setViewMode('scraper')}
-                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                                        viewMode === 'scraper'
-                                            ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-600 dark:text-white'
-                                            : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
-                                    }`}
-                                >
-                                    <Inbox size={16} />
-                                    Queue
-                                </button>
-                            )}
-                        </div>
-
-                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                            <User size={16} />
-                            <span className="font-medium">{currentUser?.username}</span>
-                            {currentUser?.role === 'admin' && (
-                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
-                                    Admin
-                                </span>
-                            )}
-                        </div>
-                        {authAPI.isAdmin() && viewMode === 'ideas' && (
-                            <button
-                                onClick={() => setIsModalOpen(true)}
-                                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition-colors shadow-sm dark:bg-blue-600 dark:hover:bg-blue-700"
-                            >
-                                <Plus size={16} />
-                                Add Idea
-                            </button>
-                        )}
-                        <button
-                            onClick={toggleDarkMode}
-                            className="inline-flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 text-sm font-medium rounded-lg transition-colors dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700"
-                            title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+                        <button 
+                            onClick={() => setIsModalOpen(true)}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
                         >
-                            {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
-                        </button>
-                        <button
-                            onClick={handleLogout}
-                            className="inline-flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 text-sm font-medium rounded-lg transition-colors dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700"
-                            title="Logout"
-                        >
-                            <LogOut size={16} />
+                            <Plus size={16} />
+                            Add Idea
                         </button>
                     </div>
                 </div>
             </div>
         </header>
 
-        {/* Filters Bar - Only show for ideas view */}
-        {viewMode === 'ideas' && (
-        <div className="border-b border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700">
+        {/* Filters Bar */}
+        <div className="border-b border-gray-200 bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                 <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto items-center">
@@ -351,18 +174,30 @@ export default function App() {
                             <input
                                 type="text"
                                 placeholder="Search ticker, thesis, or source..."
-                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition duration-150 ease-in-out dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition duration-150 ease-in-out"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
-                        <TagFilter
-                            availableTags={allTags}
-                            selectedTags={selectedTags}
-                            onChange={setSelectedTags}
+                        <TagFilter 
+                            availableTags={allTags} 
+                            selectedTags={selectedTags} 
+                            onChange={setSelectedTags} 
                         />
+                        <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2 bg-white shadow-sm focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-500 transition-all w-full sm:w-auto">
+                            <ArrowUpDown size={16} className="text-gray-400" />
+                            <select 
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value as SortOption)}
+                                className="text-sm font-medium text-gray-700 bg-transparent border-none focus:ring-0 cursor-pointer p-0 pr-6"
+                            >
+                                <option value="entryDate">Newest First</option>
+                                <option value="conviction">Highest Conviction</option>
+                                <option value="return">Best Return</option>
+                            </select>
+                        </div>
                     </div>
-
+                    
                     <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 scrollbar-hide">
                         <Filter size={16} className="text-gray-400 mr-1 flex-shrink-0" />
                         {(['All', 'Hedge Fund', 'X', 'Reddit', 'Blog', 'News', 'Other'] as const).map((type) => (
@@ -370,9 +205,9 @@ export default function App() {
                                 key={type}
                                 onClick={() => setFilterSource(type)}
                                 className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border ${
-                                    filterSource === type
-                                    ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-800'
-                                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600'
+                                    filterSource === type 
+                                    ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                                 }`}
                             >
                                 {type}
@@ -382,54 +217,25 @@ export default function App() {
                 </div>
             </div>
         </div>
-        )}
 
-        {/* Main Content */}
+        {/* Main Grid */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {viewMode === 'scraper' ? (
-                <ScraperQueue />
-            ) : viewMode === 'analytics' ? (
-                <div className="space-y-8">
-                    <PerformanceDashboard />
-                    <EarningsCalendar daysAhead={30} />
-                </div>
-            ) : isLoading ? (
-                <div className="flex flex-col items-center justify-center py-20">
-                    <Loader2 size={48} className="animate-spin text-blue-600 mb-4" />
-                    <p className="text-gray-600">Loading ideas...</p>
-                </div>
-            ) : error ? (
-                <div className="flex flex-col items-center justify-center py-20 text-center">
-                    <div className="bg-red-100 p-4 rounded-full mb-4">
-                        <Search size={32} className="text-red-600" />
-                    </div>
-                    <h3 className="text-lg font-medium text-gray-900">Error loading ideas</h3>
-                    <p className="text-red-600 mt-1 max-w-sm">{error}</p>
-                    <button
-                        onClick={loadIdeas}
-                        className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                    >
-                        Retry
-                    </button>
-                </div>
-            ) : filteredIdeas.length > 0 ? (
+            {filteredIdeas.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredIdeas.map(idea => {
                         const history = historyCache[idea.ticker] || [];
                         const performance = calculatePerformance(
-                            idea.entryPrice,
-                            idea.currentPrice,
-                            history,
+                            idea.entryPrice, 
+                            idea.currentPrice, 
+                            history, 
                             idea.entryDate
                         );
 
                         return (
                             <div key={idea.id} className="h-full">
-                                <IdeaCard
-                                    idea={idea}
+                                <IdeaCard 
+                                    idea={idea} 
                                     performance={performance}
-                                    onEdit={handleEditIdea}
-                                    isAdmin={authAPI.isAdmin()}
                                 />
                             </div>
                         );
@@ -442,31 +248,17 @@ export default function App() {
                     </div>
                     <h3 className="text-lg font-medium text-gray-900">No ideas found</h3>
                     <p className="text-gray-500 mt-1 max-w-sm">
-                        {ideas.length === 0
-                            ? 'No ideas have been added yet. Click "Add Idea" to get started.'
-                            : 'Try adjusting your search terms, filters or tags.'}
+                        Try adjusting your search terms, filters or tags.
                     </p>
                 </div>
             )}
         </main>
 
-        <AddIdeaModal
+        <AddIdeaModal 
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
             onAdd={handleAddIdea}
         />
-
-        {editingIdea && (
-          <EditIdeaModal
-              isOpen={isEditModalOpen}
-              onClose={() => {
-                setIsEditModalOpen(false);
-                setEditingIdea(null);
-              }}
-              onSave={handleSaveEdit}
-              idea={editingIdea}
-          />
-        )}
     </div>
   );
 }

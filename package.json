@@ -1,35 +1,22 @@
 {
   "name": "alphaseek",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:server": "node backend/server.js",
-    "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "build": "vite build",
-    "preview": "vite preview",
-    "server": "node backend/server.js",
-    "start": "NODE_ENV=production node backend/server.js"
+    "preview": "vite preview"
   },
   "dependencies": {
-    "better-sqlite3": "^11.7.0",
-    "cors": "^2.8.5",
-    "express": "^4.21.2",
-    "@json2csv/plainjs": "^7.0.6",
-    "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.555.0",
-    "node-cron": "^3.0.3",
-    "nodemailer": "^6.9.15",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "recharts": "^3.5.1",
-    "sentiment": "^5.0.2",
-    "snoowrap": "^1.23.0"
+    "recharts": "^3.5.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
-    "concurrently": "^9.1.2",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

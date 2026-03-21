@@ -1,15 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { StockIdea, PerformanceMetrics } from '../types';
-import { TrendingUp, TrendingDown, ExternalLink, BrainCircuit, Share2, Edit, Target, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
-import StarRating from './StarRating';
-import ExitStrategyModal from './ExitStrategyModal';
-import NewsFeed from './NewsFeed';
+import { TrendingUp, TrendingDown, ExternalLink, BrainCircuit, Share2, Info } from 'lucide-react';
 
 interface IdeaCardProps {
   idea: StockIdea;
   performance: PerformanceMetrics;
-  onEdit?: (idea: StockIdea) => void;
-  isAdmin?: boolean;
 }
 
 const PerformanceBadge = ({ label, value }: { label: string, value: number }) => {
@@ -69,38 +64,8 @@ const TradingViewWidget = ({ ticker }: { ticker: string }) => {
   return <div ref={container} className="w-full h-full" />;
 };
 
-const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance, onEdit, isAdmin }) => {
+const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
   const isProfitable = performance.Total >= 0;
-  const [isExitStrategyOpen, setIsExitStrategyOpen] = useState(false);
-  const [showNewsFeed, setShowNewsFeed] = useState(false);
-  const [localIdea, setLocalIdea] = useState(idea);
-
-  const handleExitStrategyUpdate = (updated: StockIdea) => {
-    setLocalIdea(updated);
-  };
-
-  const getEarningsDaysUntil = () => {
-    if (!localIdea.nextEarningsDate) return null;
-    const earningsDate = new Date(localIdea.nextEarningsDate);
-    const today = new Date();
-    const diffTime = earningsDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
-  const formatEarningsDate = () => {
-    if (!localIdea.nextEarningsDate) return null;
-    const daysUntil = getEarningsDaysUntil();
-    if (daysUntil === null) return null;
-
-    if (daysUntil === 0) return 'Today';
-    if (daysUntil === 1) return 'Tomorrow';
-    if (daysUntil < 0) return 'Past';
-    if (daysUntil <= 7) return `${daysUntil}d`;
-
-    const date = new Date(localIdea.nextEarningsDate);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
 
   const handleShare = async () => {
     const shareData: ShareData = {
@@ -118,7 +83,6 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance, onEdit, isAdmin 
         } else {
             const textToCopy = `${shareData.text}${shareData.url ? `\nLink: ${shareData.url}` : ''}`;
             await navigator.clipboard.writeText(textToCopy);
-            // In a real app we'd use a toast, but alert is acceptable fallback for this request context
             alert('Idea summary copied to clipboard!');
         }
     } catch (error) {
@@ -127,7 +91,6 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance, onEdit, isAdmin 
   };
 
   return (
-    <>
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200 overflow-hidden flex flex-col h-full">
       {/* Header */}
       <div className="p-5 border-b border-gray-50 flex justify-between items-start bg-gradient-to-r from-gray-50 to-white">
@@ -140,17 +103,6 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance, onEdit, isAdmin 
                     <BrainCircuit size={10} /> High Conviction
                 </span>
             )}
-            {localIdea.nextEarningsDate && getEarningsDaysUntil() !== null && getEarningsDaysUntil()! >= 0 && getEarningsDaysUntil()! <= 14 && (
-                <span className={`px-2 py-0.5 text-xs rounded-full font-medium flex items-center gap-1 ${
-                  getEarningsDaysUntil()! <= 3
-                    ? 'bg-red-100 text-red-800'
-                    : getEarningsDaysUntil()! <= 7
-                    ? 'bg-orange-100 text-orange-800'
-                    : 'bg-blue-100 text-blue-800'
-                }`}>
-                    <Calendar size={10} /> Earnings: {formatEarningsDate()}
-                </span>
-            )}
           </div>
           <p className="text-sm text-gray-500 font-medium truncate max-w-[200px]">{idea.companyName}</p>
         </div>
@@ -161,26 +113,14 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance, onEdit, isAdmin 
               </div>
               <p className="text-xs text-gray-400">Total Return</p>
             </div>
-            <div className="flex items-center gap-1">
-              {isAdmin && onEdit && (
-                <button
-                    onClick={() => onEdit(idea)}
-                    className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-full transition-colors"
-                    title="Edit Idea"
-                    aria-label="Edit Idea"
-                >
-                    <Edit size={18} />
-                </button>
-              )}
-              <button
-                  onClick={handleShare}
-                  className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
-                  title="Share Idea"
-                  aria-label="Share Idea"
-              >
-                  <Share2 size={18} />
-              </button>
-            </div>
+            <button 
+                onClick={handleShare}
+                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                title="Share Idea"
+                aria-label="Share Idea"
+            >
+                <Share2 size={18} />
+            </button>
         </div>
       </div>
 
@@ -210,85 +150,21 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance, onEdit, isAdmin 
           </p>
         </div>
 
+        {/* Company Description */}
+        {idea.description && (
+            <div className="mt-2 pt-2 border-t border-gray-100">
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <Info size={12} /> Company Profile
+                </h4>
+                <p className="text-gray-500 text-xs leading-relaxed line-clamp-3 hover:line-clamp-none transition-all cursor-pointer" title="Click to expand">
+                    {idea.description}
+                </p>
+            </div>
+        )}
+
         {/* TradingView Widget */}
         <div className="h-40 w-full border border-gray-100 rounded-lg overflow-hidden bg-white">
             <TradingViewWidget ticker={idea.ticker} />
-        </div>
-
-        {/* Rating */}
-        <div className="border-t border-gray-100 pt-3">
-          <StarRating
-            ideaId={localIdea.id}
-            currentRating={localIdea.rating}
-            currentNotes={localIdea.ratingNotes}
-            onRatingUpdate={(rating, notes) => setLocalIdea({...localIdea, rating, ratingNotes: notes})}
-          />
-        </div>
-
-        {/* Exit Strategy */}
-        {(localIdea.stopLossPrice || localIdea.profitTargetPrice || localIdea.trailingStopPct || isAdmin) && (
-          <div className="border-t border-gray-100 pt-3">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Exit Strategy</h4>
-              {isAdmin && (
-                <button
-                  onClick={() => setIsExitStrategyOpen(true)}
-                  className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                >
-                  <Target size={12} />
-                  {localIdea.stopLossPrice || localIdea.profitTargetPrice ? 'Edit' : 'Set'}
-                </button>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              {localIdea.stopLossPrice && (
-                <div className="bg-red-50 p-2 rounded border border-red-100">
-                  <div className="text-red-600 font-medium">Stop Loss</div>
-                  <div className="text-red-900 font-bold">${localIdea.stopLossPrice.toFixed(2)}</div>
-                  <div className="text-red-600 text-[10px]">
-                    {(((localIdea.stopLossPrice - localIdea.currentPrice) / localIdea.currentPrice) * 100).toFixed(1)}%
-                  </div>
-                </div>
-              )}
-              {localIdea.profitTargetPrice && (
-                <div className="bg-green-50 p-2 rounded border border-green-100">
-                  <div className="text-green-600 font-medium">Target</div>
-                  <div className="text-green-900 font-bold">${localIdea.profitTargetPrice.toFixed(2)}</div>
-                  <div className="text-green-600 text-[10px]">
-                    +{(((localIdea.profitTargetPrice - localIdea.currentPrice) / localIdea.currentPrice) * 100).toFixed(1)}%
-                  </div>
-                </div>
-              )}
-              {localIdea.trailingStopPct && (
-                <div className="bg-orange-50 p-2 rounded border border-orange-100 col-span-2">
-                  <div className="text-orange-600 font-medium">Trailing Stop</div>
-                  <div className="text-orange-900 font-bold">{localIdea.trailingStopPct}%</div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* News Feed Section */}
-        <div className="border-t border-gray-100 pt-3">
-          <button
-            onClick={() => setShowNewsFeed(!showNewsFeed)}
-            className="w-full flex items-center justify-between text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-700 transition-colors"
-          >
-            <span>Latest News</span>
-            {showNewsFeed ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
-          {showNewsFeed && (
-            <div className="mt-3">
-              <NewsFeed
-                ideaId={localIdea.id}
-                ticker={localIdea.ticker}
-                companyName={localIdea.companyName}
-                limit={5}
-                compact={true}
-              />
-            </div>
-          )}
         </div>
 
         {/* Metrics Grid */}
@@ -296,11 +172,6 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance, onEdit, isAdmin 
           <PerformanceBadge label="1W" value={performance['1W']} />
           <PerformanceBadge label="1M" value={performance['1M']} />
           <PerformanceBadge label="6M" value={performance['6M']} />
-          <PerformanceBadge label="1Y" value={performance['1Y']} />
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          <PerformanceBadge label="3Y" value={performance['3Y']} />
-          <PerformanceBadge label="5Y" value={performance['5Y']} />
           <PerformanceBadge label="YTD" value={performance.YTD} />
         </div>
       </div>
@@ -322,15 +193,6 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance, onEdit, isAdmin 
          )}
       </div>
     </div>
-
-      {/* Exit Strategy Modal */}
-      <ExitStrategyModal
-        isOpen={isExitStrategyOpen}
-        onClose={() => setIsExitStrategyOpen(false)}
-        idea={localIdea}
-        onUpdate={handleExitStrategyUpdate}
-      />
-    </>
   );
 };
 

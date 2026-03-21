@@ -1,11 +1,10 @@
 export type SourceType = 'Reddit' | 'X' | 'Hedge Fund' | 'Blog' | 'News' | 'Other';
-export type IdeaStatus = 'Active' | 'Watching' | 'Exited' | 'Stopped Out' | 'Archived' | 'Invalidated';
-export type PositionStatus = 'watching' | 'invested' | 'exited';
 
 export interface StockIdea {
   id: string;
   ticker: string;
   companyName: string;
+  description?: string; // Company description fetched from API
   source: string; // URL or Name
   sourceType: SourceType;
   originalLink?: string;
@@ -16,22 +15,6 @@ export interface StockIdea {
   summary: string;
   conviction: 'High' | 'Medium' | 'Low';
   tags: string[];
-  status?: IdeaStatus;
-  positionStatus?: PositionStatus;
-  positionSize?: number;
-  costBasis?: number;
-  exitDate?: string;
-  exitPrice?: number;
-  exitReason?: string;
-  actualReturn?: number;
-  rating?: number; // 1-5 stars
-  ratingNotes?: string;
-  stopLossPrice?: number;
-  profitTargetPrice?: number;
-  trailingStopPct?: number;
-  nextEarningsDate?: string;
-  nextEarningsDateRaw?: number;
-  estimatedEPS?: number;
 }
 
 export interface HistoricalDataPoint {
@@ -45,9 +28,7 @@ export interface PerformanceMetrics {
   '6M': number;
   'YTD': number;
   '1Y': number;
-  '3Y': number;
-  '5Y': number;
   'Total': number;
 }
 
-export type Timeframe = '1W' | '1M' | '6M' | 'YTD' | '1Y' | '3Y' | '5Y' | 'ALL';
+export type Timeframe = '1W' | '1M' | '6M' | 'YTD' | '1Y' | 'ALL';

@@ -7,8 +7,6 @@ interface ProxyDef {
 }
 
 // List of public CORS proxies to try in order.
-// Using 'get' for allorigins is often more reliable than 'raw' as it wraps the response
-// and avoids some content-type/header filtering issues.
 const PROXIES: ProxyDef[] = [
     { url: "https://api.allorigins.win/get?url=", isWrapper: true },
     { url: "https://corsproxy.io/?", isWrapper: false },
@@ -17,6 +15,7 @@ const PROXIES: ProxyDef[] = [
 ];
 
 const YAHOO_BASE_URL = "https://query2.finance.yahoo.com/v8/finance/chart/";
+const YAHOO_PROFILE_URL = "https://query2.finance.yahoo.com/v10/finance/quoteSummary/";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -31,14 +30,10 @@ const FALLBACK_PRICES: Record<string, number> = {
     'UBER': 75.00, 'ABNB': 140.00, 'SBUX': 95.00, 'NKE': 85.00
 };
 
-// Helper to fetch data from Yahoo using rotated proxies
-const fetchYahooData = async (ticker: string): Promise<{ price: number, history: HistoricalDataPoint[] } | null> => {
-    const symbol = ticker.toUpperCase();
-    // Add cache buster to prevent proxy caching of old data/errors
-    const cacheBuster = `&_cb=${Date.now()}`;
-    const targetUrl = `${YAHOO_BASE_URL}${symbol}?interval=1d&range=5y${cacheBuster}`;
+// Generic helper to fetch data via proxy rotation
+const fetchViaProxy = async (targetUrl: string, logLabel: string): Promise<any | null> => {
     const encodedUrl = encodeURIComponent(targetUrl);
-
+    
     for (const proxy of PROXIES) {
         try {
             const proxiedUrl = `${proxy.url}${encodedUrl}`;
@@ -47,14 +42,10 @@ const fetchYahooData = async (ticker: string): Promise<{ price: number, history:
                 method: 'GET',
             });
             
-            if (!response.ok) {
-                continue; 
-            }
+            if (!response.ok) continue;
             
             const text = await response.text();
-            if (!text || text.trim().startsWith('<')) {
-                 continue;
-            }
+            if (!text || text.trim().startsWith('<')) continue;
 
             let json;
             try {
@@ -63,66 +54,66 @@ const fetchYahooData = async (ticker: string): Promise<{ price: number, history:
                 continue;
             }
 
-            // Extract actual Yahoo response based on proxy type
-            let yahooData;
+            // Extract actual response based on proxy type
+            let finalData;
             if (proxy.isWrapper) {
-                // For AllOrigins 'get' wrapper
                 if (json.contents) {
-                     // contents is a stringified JSON from Yahoo
                      try {
-                        yahooData = JSON.parse(json.contents);
+                        finalData = JSON.parse(json.contents);
                      } catch (e) {
-                        // Sometimes it returns the object directly if content-type was json
-                        yahooData = json.contents;
+                        finalData = json.contents;
                      }
                 } else {
                     continue;
                 }
             } else {
-                // Direct proxies return the body directly
-                yahooData = json;
+                finalData = json;
             }
-
-            // Validate structure
-            const result = yahooData?.chart?.result?.[0];
-            
-            if (!result) {
-                if (yahooData?.chart?.error) {
-                   console.warn(`Yahoo API Error for ${symbol} via ${proxy.url}:`, yahooData.chart.error);
-                }
-                continue;
-            }
-
-            const meta = result.meta;
-            const currentPrice = meta.regularMarketPrice;
-            
-            const timestamps = result.timestamp || [];
-            const quote = result.indicators?.quote?.[0] || {};
-            const closes = quote.close || [];
-            
-            const history: HistoricalDataPoint[] = [];
-            
-            for (let i = 0; i < timestamps.length; i++) {
-                // Ensure we have a valid price and date
-                if (timestamps[i] && closes[i] !== null && closes[i] !== undefined) {
-                    history.push({
-                        date: new Date(timestamps[i] * 1000).toISOString().split('T')[0],
-                        price: parseFloat(closes[i].toFixed(2))
-                    });
-                }
-            }
-            
-            // console.log(`Success fetching ${symbol} via ${proxy.url}`);
-            return { price: currentPrice, history };
+            return finalData;
 
         } catch (error) {
-            // console.warn(`Error fetching ${symbol} via ${proxy.url}:`, error);
             // Continue to next proxy
         }
     }
-
-    console.warn(`All proxies failed for ${symbol}. Using fallback.`);
+    console.warn(`All proxies failed for ${logLabel}.`);
     return null;
+};
+
+const fetchYahooData = async (ticker: string): Promise<{ price: number, history: HistoricalDataPoint[] } | null> => {
+    const symbol = ticker.toUpperCase();
+    const cacheBuster = `&_cb=${Date.now()}`;
+    const targetUrl = `${YAHOO_BASE_URL}${symbol}?interval=1d&range=5y${cacheBuster}`;
+    
+    const yahooData = await fetchViaProxy(targetUrl, `Chart:${symbol}`);
+    
+    const result = yahooData?.chart?.result?.[0];
+    
+    if (!result) {
+        if (yahooData?.chart?.error) {
+           console.warn(`Yahoo API Error for ${symbol}:`, yahooData.chart.error);
+        }
+        return null;
+    }
+
+    const meta = result.meta;
+    const currentPrice = meta.regularMarketPrice;
+    
+    const timestamps = result.timestamp || [];
+    const quote = result.indicators?.quote?.[0] || {};
+    const closes = quote.close || [];
+    
+    const history: HistoricalDataPoint[] = [];
+    
+    for (let i = 0; i < timestamps.length; i++) {
+        if (timestamps[i] && closes[i] !== null && closes[i] !== undefined) {
+            history.push({
+                date: new Date(timestamps[i] * 1000).toISOString().split('T')[0],
+                price: parseFloat(closes[i].toFixed(2))
+            });
+        }
+    }
+    
+    return { price: currentPrice, history };
 };
 
 // Deterministic random number generator for fallback mocks
@@ -137,8 +128,6 @@ const generateMockHistory = (ticker: string, currentPrice: number): HistoricalDa
     let price = currentPrice;
     const seed = ticker.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
 
-    // Generate a slightly more realistic trend (e.g. general market drift) 
-    // rather than pure random walk to look better in UI if fallback is used.
     for (let i = 0; i < 365 * 5; i++) { // 5 years back
         const date = new Date(now - (i * ONE_DAY_MS));
         history.push({
@@ -146,14 +135,12 @@ const generateMockHistory = (ticker: string, currentPrice: number): HistoricalDa
             price: parseFloat(price.toFixed(2))
         });
         
-        // Reverse engineer walk: 
-        const randomChange = (seededRandom(seed + i) - 0.45) * 2.5; // slight bias to 0.05 positive mean
+        const randomChange = (seededRandom(seed + i) - 0.45) * 2.5;
         const factor = 1 + (randomChange / 100);
         
         price = price / factor;
         if (price < 0.1) price = 0.1;
     }
-    // We generated backwards from Now -> Past, but array should be Oldest -> Newest
     return history.reverse();
 };
 
@@ -180,7 +167,31 @@ export const getCurrentPrice = async (ticker: string): Promise<number> => {
     return 100.00; // Generic default
 };
 
-export const getCompanyProfile = async (ticker: string): Promise<{ name: string }> => {
+export const getCompanyProfile = async (ticker: string): Promise<{ name: string, description: string }> => {
+    const symbol = ticker.toUpperCase();
+    
+    // Try fetching from Yahoo Finance QuoteSummary
+    const targetUrl = `${YAHOO_PROFILE_URL}${symbol}?modules=assetProfile,price`;
+    const data = await fetchViaProxy(targetUrl, `Profile:${symbol}`);
+
+    let name = '';
+    let description = '';
+
+    if (data && data.quoteSummary && data.quoteSummary.result && data.quoteSummary.result[0]) {
+        const result = data.quoteSummary.result[0];
+        if (result.price) {
+            name = result.price.longName || result.price.shortName || '';
+        }
+        if (result.assetProfile) {
+            description = result.assetProfile.longBusinessSummary || '';
+        }
+    }
+
+    if (name && description) {
+        return { name, description };
+    }
+
+    // Fallback map if API fails
     const map: Record<string, string> = {
         'AAPL': 'Apple Inc.', 'MSFT': 'Microsoft Corporation', 'GOOG': 'Alphabet Inc.',
         'AMZN': 'Amazon.com Inc.', 'TSLA': 'Tesla, Inc.', 'NVDA': 'NVIDIA Corporation',
@@ -193,7 +204,11 @@ export const getCompanyProfile = async (ticker: string): Promise<{ name: string 
         'UBER': 'Uber Technologies', 'ABNB': 'Airbnb, Inc.', 'SBUX': 'Starbucks Corp.',
         'NKE': 'Nike, Inc.'
     };
-    return { name: map[ticker.toUpperCase()] || `${ticker.toUpperCase()} Corp.` };
+    
+    return { 
+        name: name || map[symbol] || `${symbol} Corp.`, 
+        description: description 
+    };
 }
 
 export const calculatePerformance = (
@@ -211,13 +226,11 @@ export const calculatePerformance = (
   const totalReturn = pct(entryPrice, currentPrice);
 
   if (!history || history.length === 0) {
-      return { '1W': 0, '1M': 0, '6M': 0, 'YTD': 0, '1Y': 0, '3Y': 0, '5Y': 0, 'Total': totalReturn };
+      return { '1W': 0, '1M': 0, '6M': 0, 'YTD': 0, '1Y': 0, 'Total': totalReturn };
   }
 
   const getPriceAtAgo = (daysAgo: number): number => {
       const targetDate = new Date(Date.now() - (daysAgo * ONE_DAY_MS)).toISOString().split('T')[0];
-      // Find closest date in history (sorted oldest to newest)
-      // We search backwards from end for better performance on recent dates
       for (let i = history.length - 1; i >= 0; i--) {
           if (history[i].date <= targetDate) {
               return history[i].price;
@@ -236,8 +249,6 @@ export const calculatePerformance = (
     '6M': pct(getPriceAtAgo(180), currentPrice),
     'YTD': pct(ytdPrice, currentPrice),
     '1Y': pct(getPriceAtAgo(365), currentPrice),
-    '3Y': pct(getPriceAtAgo(365 * 3), currentPrice),
-    '5Y': pct(getPriceAtAgo(365 * 5), currentPrice),
     'Total': totalReturn,
   };
 };

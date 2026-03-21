@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StockIdea, SourceType } from '../types';
-import { X, Loader2, AlertTriangle } from 'lucide-react';
-import { stocksAPI, ideasAPI } from '../services/apiClient';
+import { X, Loader2 } from 'lucide-react';
+import { getCurrentPrice, getCompanyProfile } from '../services/stockService';
 
 interface AddIdeaModalProps {
   isOpen: boolean;
@@ -12,6 +12,7 @@ interface AddIdeaModalProps {
 const AddIdeaModal: React.FC<AddIdeaModalProps> = ({ isOpen, onClose, onAdd }) => {
   const [ticker, setTicker] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [description, setDescription] = useState('');
   const [source, setSource] = useState('');
   const [sourceType, setSourceType] = useState<SourceType>('X');
   const [originalLink, setOriginalLink] = useState('');
@@ -24,30 +25,25 @@ const AddIdeaModal: React.FC<AddIdeaModalProps> = ({ isOpen, onClose, onAdd }) =
   const [conviction, setConviction] = useState<'High' | 'Medium' | 'Low'>('Medium');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [priceLoading, setPriceLoading] = useState(false);
-  const [duplicateCheck, setDuplicateCheck] = useState<{exists: boolean, ideas: any[]} | null>(null);
 
   useEffect(() => {
     if (ticker) {
         const fetchDetails = async () => {
              setPriceLoading(true);
              setFetchedPrice(null);
-             setDuplicateCheck(null);
              try {
-                 // Check for duplicates
-                 const dupCheck = await ideasAPI.checkDuplicate(ticker);
-                 setDuplicateCheck(dupCheck);
-
-                 const stockData = await stocksAPI.getStockData(ticker);
-                 setCompanyName(stockData.companyName);
-                 setFetchedPrice(stockData.currentPrice);
-
+                 const profile = await getCompanyProfile(ticker);
+                 setCompanyName(profile.name);
+                 setDescription(profile.description);
+                 
+                 const price = await getCurrentPrice(ticker);
+                 setFetchedPrice(price);
+                 
                  // Pre-fill entry price only if it's currently empty
                  setEntryPrice(prev => {
-                     if (!prev) return stockData.currentPrice.toFixed(2);
+                     if (!prev) return price.toFixed(2);
                      return prev;
                  });
-             } catch (err) {
-                 console.error('Failed to fetch stock data:', err);
              } finally {
                  setPriceLoading(false);
              }
@@ -56,8 +52,8 @@ const AddIdeaModal: React.FC<AddIdeaModalProps> = ({ isOpen, onClose, onAdd }) =
         return () => clearTimeout(timeout);
     } else {
         setCompanyName('');
+        setDescription('');
         setFetchedPrice(null);
-        setDuplicateCheck(null);
     }
   }, [ticker]);
 
@@ -69,6 +65,7 @@ const AddIdeaModal: React.FC<AddIdeaModalProps> = ({ isOpen, onClose, onAdd }) =
       await onAdd({
         ticker: ticker.toUpperCase(),
         companyName,
+        description,
         source,
         sourceType,
         originalLink,
@@ -87,6 +84,7 @@ const AddIdeaModal: React.FC<AddIdeaModalProps> = ({ isOpen, onClose, onAdd }) =
       setFetchedPrice(null);
       setEntryPrice('');
       setCompanyName('');
+      setDescription('');
       setTagsInput('');
     } catch (err) {
       console.error(err);
@@ -139,31 +137,6 @@ const AddIdeaModal: React.FC<AddIdeaModalProps> = ({ isOpen, onClose, onAdd }) =
                             </span>
                         )}
                     </div>
-
-                    {/* Duplicate Warning */}
-                    {duplicateCheck?.exists && (
-                        <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                            <div className="flex items-start gap-2">
-                                <AlertTriangle size={16} className="text-amber-600 mt-0.5 flex-shrink-0" />
-                                <div>
-                                    <p className="text-sm font-medium text-amber-900">Duplicate Ticker Detected</p>
-                                    <p className="text-xs text-amber-700 mt-1">
-                                        {duplicateCheck.ideas.length} existing idea{duplicateCheck.ideas.length > 1 ? 's' : ''} found for {ticker}:
-                                    </p>
-                                    <ul className="mt-2 space-y-1">
-                                        {duplicateCheck.ideas.slice(0, 3).map((idea: any) => (
-                                            <li key={idea.id} className="text-xs text-amber-800">
-                                                • Added {new Date(idea.entry_date).toLocaleDateString()} - Status: {idea.status}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                    <p className="text-xs text-amber-700 mt-2 italic">
-                                        You can still add this idea if you want to track multiple entries.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </div>
 
                 <div>
