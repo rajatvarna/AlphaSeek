@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StockIdea, SourceType } from '../types';
+import { StockIdea, SourceType, IdeaStatus } from '../types';
 import { X, Loader2 } from 'lucide-react';
 import { getCurrentPrice, getCompanyProfile } from '../services/stockService';
 
@@ -23,6 +23,9 @@ const AddIdeaModal: React.FC<AddIdeaModalProps> = ({ isOpen, onClose, onAdd }) =
   const [summary, setSummary] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [conviction, setConviction] = useState<'High' | 'Medium' | 'Low'>('Medium');
+  const [status, setStatus] = useState<IdeaStatus>('Active');
+  const [priceTarget, setPriceTarget] = useState<string>('');
+  const [stopLoss, setStopLoss] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [priceLoading, setPriceLoading] = useState(false);
 
@@ -74,7 +77,10 @@ const AddIdeaModal: React.FC<AddIdeaModalProps> = ({ isOpen, onClose, onAdd }) =
         thesis,
         summary,
         conviction,
-        tags
+        tags,
+        status,
+        priceTarget: priceTarget ? parseFloat(priceTarget) : undefined,
+        stopLoss: stopLoss ? parseFloat(stopLoss) : undefined
       });
       onClose();
       // Reset form
@@ -86,6 +92,9 @@ const AddIdeaModal: React.FC<AddIdeaModalProps> = ({ isOpen, onClose, onAdd }) =
       setCompanyName('');
       setDescription('');
       setTagsInput('');
+      setStatus('Active');
+      setPriceTarget('');
+      setStopLoss('');
     } catch (err) {
       console.error(err);
     } finally {
@@ -140,6 +149,25 @@ const AddIdeaModal: React.FC<AddIdeaModalProps> = ({ isOpen, onClose, onAdd }) =
                 </div>
 
                 <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <div className="flex bg-gray-100 rounded-lg p-1">
+                        {(['Watchlist', 'Active', 'Closed'] as const).map((level) => (
+                            <button
+                                key={level}
+                                type="button"
+                                onClick={() => setStatus(level)}
+                                className={`flex-1 text-sm py-1.5 rounded-md transition-all ${status === level ? 'bg-white shadow-sm font-medium text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                            >
+                                {level}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* Price Targets Row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Entry Price ($)</label>
                     <input
                         type="number"
@@ -149,6 +177,28 @@ const AddIdeaModal: React.FC<AddIdeaModalProps> = ({ isOpen, onClose, onAdd }) =
                         onChange={(e) => setEntryPrice(e.target.value)}
                         className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                         placeholder="0.00"
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Price Target ($)</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        value={priceTarget}
+                        onChange={(e) => setPriceTarget(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                        placeholder="Optional"
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Stop Loss ($)</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        value={stopLoss}
+                        onChange={(e) => setStopLoss(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                        placeholder="Optional"
                     />
                 </div>
             </div>

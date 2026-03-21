@@ -3,8 +3,9 @@ import { StockIdea, SourceType } from './types';
 import { getStockHistory, getCurrentPrice, calculatePerformance, getCompanyProfile } from './services/stockService';
 import IdeaCard from './components/IdeaCard';
 import AddIdeaModal from './components/AddIdeaModal';
+import IdeaDetailsModal from './components/IdeaDetailsModal';
 import TagFilter from './components/TagFilter';
-import { Plus, Search, Filter, Rocket, ArrowUpDown } from 'lucide-react';
+import { Plus, Search, Filter, Rocket, ArrowUpDown, Download, Upload } from 'lucide-react';
 
 type SortOption = 'conviction' | 'entryDate' | 'return';
 
@@ -42,8 +43,20 @@ const INITIAL_IDEAS: StockIdea[] = [
 ];
 
 export default function App() {
-  const [ideas, setIdeas] = useState<StockIdea[]>(INITIAL_IDEAS);
+  const [ideas, setIdeas] = useState<StockIdea[]>(() => {
+    const saved = localStorage.getItem('alphaseek_ideas');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse ideas from local storage');
+      }
+    }
+    return INITIAL_IDEAS;
+  });
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedIdea, setSelectedIdea] = useState<StockIdea | null>(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSource, setFilterSource] = useState<SourceType | 'All'>('All');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -51,6 +64,11 @@ export default function App() {
   
   // Cache for historical data to avoid re-generating on every render
   const [historyCache, setHistoryCache] = useState<Record<string, any[]>>({});
+
+  // Save to local storage whenever ideas change
+  useEffect(() => {
+    localStorage.setItem('alphaseek_ideas', JSON.stringify(ideas));
+  }, [ideas]);
 
   // Initialize/Update prices on load
   useEffect(() => {
@@ -87,7 +105,8 @@ export default function App() {
     const newIdea: StockIdea = {
         ...newIdeaPart,
         id: Date.now().toString(),
-        currentPrice
+        currentPrice,
+        status: newIdeaPart.status || 'Active'
     };
     
     // Update cache for new ticker
@@ -98,6 +117,44 @@ export default function App() {
     }));
 
     setIdeas(prev => [newIdea, ...prev]);
+  };
+
+  const handleExport = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(ideas, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href",     dataStr);
+    downloadAnchorNode.setAttribute("download", "alphaseek_ideas.json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  };
+
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const importedIdeas = JSON.parse(e.target?.result as string);
+        if (Array.isArray(importedIdeas)) {
+          setIdeas(importedIdeas);
+        }
+      } catch (error) {
+        console.error("Error parsing imported JSON:", error);
+        alert("Invalid JSON file.");
+      }
+    };
+    reader.readAsText(file);
+    // Reset input
+    event.target.value = '';
+  };
+
+  const handleUpdateIdea = (updatedIdea: StockIdea) => {
+    setIdeas(prev => prev.map(idea => idea.id === updatedIdea.id ? updatedIdea : idea));
+    if (selectedIdea?.id === updatedIdea.id) {
+        setSelectedIdea(updatedIdea);
+    }
   };
 
   const allTags = useMemo(() => {
@@ -150,6 +207,27 @@ export default function App() {
                         <h1 className="text-xl font-bold text-gray-900 tracking-tight">AlphaSeek</h1>
                     </div>
                     <div className="flex items-center gap-4">
+                        <input 
+                            type="file" 
+                            accept=".json" 
+                            onChange={handleImport} 
+                            className="hidden" 
+                            id="import-upload" 
+                        />
+                        <label 
+                            htmlFor="import-upload"
+                            className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors shadow-sm cursor-pointer"
+                        >
+                            <Upload size={16} />
+                            <span className="hidden sm:inline">Import</span>
+                        </label>
+                        <button 
+                            onClick={handleExport}
+                            className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors shadow-sm"
+                        >
+                            <Download size={16} />
+                            <span className="hidden sm:inline">Export</span>
+                        </button>
                         <button 
                             onClick={() => setIsModalOpen(true)}
                             className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
@@ -165,6 +243,41 @@ export default function App() {
         {/* Filters Bar */}
         <div className="border-b border-gray-200 bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                {/* Dashboard Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">Total Ideas</p>
+                        <p className="text-2xl font-bold text-gray-900">{ideas.length}</p>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">Active Ideas</p>
+                        <p className="text-2xl font-bold text-gray-900">{ideas.filter(i => i.status === 'Active' || !i.status).length}</p>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">Win Rate (Active)</p>
+                        <p className="text-2xl font-bold text-gray-900">
+                            {(() => {
+                                const active = ideas.filter(i => i.status === 'Active' || !i.status);
+                                if (active.length === 0) return '0%';
+                                const winners = active.filter(i => i.currentPrice > i.entryPrice).length;
+                                return Math.round((winners / active.length) * 100) + '%';
+                            })()}
+                        </p>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">Avg Return (Active)</p>
+                        <p className="text-2xl font-bold text-gray-900">
+                            {(() => {
+                                const active = ideas.filter(i => i.status === 'Active' || !i.status);
+                                if (active.length === 0) return '0.00%';
+                                const totalReturn = active.reduce((sum, i) => sum + ((i.currentPrice - i.entryPrice) / i.entryPrice), 0);
+                                const avg = (totalReturn / active.length) * 100;
+                                return (avg > 0 ? '+' : '') + avg.toFixed(2) + '%';
+                            })()}
+                        </p>
+                    </div>
+                </div>
+
                 <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto items-center">
                         <div className="relative w-full sm:w-80">
@@ -224,15 +337,23 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredIdeas.map(idea => {
                         const history = historyCache[idea.ticker] || [];
+                        const currentOrExitPrice = idea.status === 'Closed' && idea.exitPrice ? idea.exitPrice : idea.currentPrice;
                         const performance = calculatePerformance(
                             idea.entryPrice, 
-                            idea.currentPrice, 
+                            currentOrExitPrice, 
                             history, 
                             idea.entryDate
                         );
 
                         return (
-                            <div key={idea.id} className="h-full">
+                            <div 
+                                key={idea.id} 
+                                className="h-full cursor-pointer"
+                                onClick={() => {
+                                    setSelectedIdea(idea);
+                                    setIsDetailsModalOpen(true);
+                                }}
+                            >
                                 <IdeaCard 
                                     idea={idea} 
                                     performance={performance}
@@ -258,6 +379,22 @@ export default function App() {
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
             onAdd={handleAddIdea}
+        />
+
+        <IdeaDetailsModal
+            isOpen={isDetailsModalOpen}
+            onClose={() => {
+                setIsDetailsModalOpen(false);
+                setSelectedIdea(null);
+            }}
+            idea={selectedIdea}
+            performance={selectedIdea ? calculatePerformance(
+                selectedIdea.entryPrice,
+                selectedIdea.status === 'Closed' && selectedIdea.exitPrice ? selectedIdea.exitPrice : selectedIdea.currentPrice,
+                historyCache[selectedIdea.ticker] || [],
+                selectedIdea.entryDate
+            ) : null}
+            onUpdateIdea={handleUpdateIdea}
         />
     </div>
   );

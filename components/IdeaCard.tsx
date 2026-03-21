@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { StockIdea, PerformanceMetrics } from '../types';
-import { TrendingUp, TrendingDown, ExternalLink, BrainCircuit, Share2, Info } from 'lucide-react';
+import { TrendingUp, TrendingDown, ExternalLink, BrainCircuit, Share2, Info, Target, ShieldAlert } from 'lucide-react';
 
 interface IdeaCardProps {
   idea: StockIdea;
@@ -21,51 +21,45 @@ const PerformanceBadge = ({ label, value }: { label: string, value: number }) =>
 };
 
 const TradingViewWidget = ({ ticker }: { ticker: string }) => {
-  const container = useRef<HTMLDivElement>(null);
+  const config = {
+    symbol: ticker,
+    width: "100%",
+    height: "100%",
+    locale: "en",
+    dateRange: "12M",
+    colorTheme: "light",
+    isTransparent: true,
+    autosize: true,
+    largeChartUrl: ""
+  };
 
-  useEffect(() => {
-    if (!container.current) return;
-    
-    // Clear any existing widget
-    container.current.innerHTML = '';
+  const src = `https://s.tradingview.com/embed-widget/mini-symbol-overview/?locale=en#${encodeURIComponent(JSON.stringify(config))}`;
 
-    const script = document.createElement("script");
-    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js";
-    script.type = "text/javascript";
-    script.async = true;
-    script.innerHTML = JSON.stringify({
-      "symbol": ticker,
-      "width": "100%",
-      "height": "100%",
-      "locale": "en",
-      "dateRange": "12M",
-      "colorTheme": "light",
-      "isTransparent": true,
-      "autosize": true,
-      "largeChartUrl": ""
-    });
-    
-    const widgetContainer = document.createElement("div");
-    widgetContainer.className = "tradingview-widget-container";
-    widgetContainer.style.height = "100%";
-    widgetContainer.style.width = "100%";
-    
-    const widgetBody = document.createElement("div");
-    widgetBody.className = "tradingview-widget-container__widget";
-    widgetBody.style.height = "100%";
-    widgetBody.style.width = "100%";
-    
-    widgetContainer.appendChild(widgetBody);
-    widgetContainer.appendChild(script);
-    
-    container.current.appendChild(widgetContainer);
-  }, [ticker]);
-
-  return <div ref={container} className="w-full h-full" />;
+  return (
+    <div className="w-full h-full tradingview-widget-container">
+      <iframe 
+        src={src} 
+        width="100%" 
+        height="100%" 
+        style={{ border: 0 }}
+        scrolling="no" 
+      />
+    </div>
+  );
 };
 
 const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
   const isProfitable = performance.Total >= 0;
+  const status = idea.status || 'Active';
+  const currentOrExitPrice = status === 'Closed' && idea.exitPrice ? idea.exitPrice : idea.currentPrice;
+
+  const getStatusColor = () => {
+    switch (status) {
+      case 'Watchlist': return 'bg-purple-100 text-purple-800';
+      case 'Closed': return 'bg-gray-200 text-gray-800';
+      case 'Active': default: return 'bg-blue-100 text-blue-800';
+    }
+  };
 
   const handleShare = async () => {
     const shareData: ShareData = {
@@ -93,10 +87,11 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200 overflow-hidden flex flex-col h-full">
       {/* Header */}
-      <div className="p-5 border-b border-gray-50 flex justify-between items-start bg-gradient-to-r from-gray-50 to-white">
+      <div className="p-5 border-b border-gray-50 flex justify-between items-start bg-gradient-to-r from-gray-50 to-white shrink-0">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <h3 className="text-xl font-bold text-gray-900 tracking-tight">{idea.ticker}</h3>
+            <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${getStatusColor()}`}>{status}</span>
             <span className="px-2 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full font-medium">{idea.sourceType}</span>
             {idea.conviction === 'High' && (
                 <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full font-medium flex items-center gap-1">
@@ -114,7 +109,7 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
               <p className="text-xs text-gray-400">Total Return</p>
             </div>
             <button 
-                onClick={handleShare}
+                onClick={(e) => { e.stopPropagation(); handleShare(); }}
                 className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
                 title="Share Idea"
                 aria-label="Share Idea"
@@ -136,11 +131,31 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
           </div>
           <div className="h-8 w-px bg-gray-200 mx-2"></div>
            <div className="flex flex-col text-right">
-             <span className="text-xs text-gray-400">Current</span>
-             <span className="font-semibold text-gray-800">${idea.currentPrice.toFixed(2)}</span>
-             <span className="text-[10px] text-green-600 font-medium">Live</span>
+             <span className="text-xs text-gray-400">{status === 'Closed' ? 'Exit' : 'Current'}</span>
+             <span className="font-semibold text-gray-800">${currentOrExitPrice.toFixed(2)}</span>
+             <span className={`text-[10px] font-medium ${status === 'Closed' ? 'text-gray-500' : 'text-green-600'}`}>
+                {status === 'Closed' ? idea.exitDate || 'Closed' : 'Live'}
+             </span>
           </div>
         </div>
+
+        {/* Targets */}
+        {(idea.priceTarget || idea.stopLoss) && (
+            <div className="flex gap-4 text-xs font-medium border-t border-gray-100 pt-3">
+                {idea.priceTarget && (
+                    <div className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md">
+                        <Target size={14} />
+                        <span>Target: ${idea.priceTarget.toFixed(2)}</span>
+                    </div>
+                )}
+                {idea.stopLoss && (
+                    <div className="flex items-center gap-1.5 text-rose-700 bg-rose-50 px-2 py-1 rounded-md">
+                        <ShieldAlert size={14} />
+                        <span>Stop: ${idea.stopLoss.toFixed(2)}</span>
+                    </div>
+                )}
+            </div>
+        )}
 
         {/* Summary */}
         <div className="prose prose-sm">
@@ -163,12 +178,12 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
         )}
 
         {/* TradingView Widget */}
-        <div className="h-40 w-full border border-gray-100 rounded-lg overflow-hidden bg-white">
+        <div className="h-[220px] w-full border border-gray-100 rounded-lg overflow-hidden bg-white shrink-0">
             <TradingViewWidget ticker={idea.ticker} />
         </div>
 
         {/* Metrics Grid */}
-        <div className="grid grid-cols-4 gap-2 mt-auto">
+        <div className="grid grid-cols-4 gap-2 mt-auto shrink-0">
           <PerformanceBadge label="1W" value={performance['1W']} />
           <PerformanceBadge label="1M" value={performance['1M']} />
           <PerformanceBadge label="6M" value={performance['6M']} />
@@ -177,7 +192,7 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center">
+      <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center shrink-0">
          <span className="text-xs text-gray-400 flex items-center gap-1">
             Source: <span className="font-medium text-gray-600 truncate max-w-[100px]">{idea.source}</span>
          </span>
@@ -186,6 +201,7 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
                 href={idea.originalLink} 
                 target="_blank" 
                 rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
                 className="text-blue-600 hover:text-blue-800 text-xs font-medium flex items-center gap-1 transition-colors"
             >
                 Original Link <ExternalLink size={12} />
