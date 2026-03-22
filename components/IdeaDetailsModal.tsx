@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StockIdea, PerformanceMetrics, IdeaNote } from '../types';
-import { X, ExternalLink, TrendingUp, TrendingDown, Target, ShieldAlert, Plus, MessageSquare } from 'lucide-react';
+import { X, ExternalLink, TrendingUp, TrendingDown, Target, ShieldAlert, Plus, MessageSquare, Trash2 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import AdvancedTradingViewWidget from './AdvancedTradingViewWidget';
@@ -11,10 +11,12 @@ interface IdeaDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUpdateIdea: (updatedIdea: StockIdea) => void;
+  onDeleteIdea: (id: string) => void;
 }
 
-const IdeaDetailsModal: React.FC<IdeaDetailsModalProps> = ({ idea, performance, isOpen, onClose, onUpdateIdea }) => {
+const IdeaDetailsModal: React.FC<IdeaDetailsModalProps> = ({ idea, performance, isOpen, onClose, onUpdateIdea, onDeleteIdea }) => {
   const [newNote, setNewNote] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   if (!isOpen || !idea || !performance) return null;
 
@@ -81,13 +83,18 @@ const IdeaDetailsModal: React.FC<IdeaDetailsModalProps> = ({ idea, performance, 
           <div className="flex items-center gap-6">
             <div className="text-right">
               <div className={`text-3xl font-bold ${isProfitable ? 'text-green-600' : 'text-red-600'}`}>
-                {isProfitable ? '+' : ''}{performance.Total.toFixed(2)}%
+                {isProfitable ? '+' : ''}{(performance.Total || 0).toFixed(2)}%
               </div>
               <p className="text-sm text-gray-500">Total Return</p>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
-              <X size={24} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowDeleteConfirm(true)} className="p-2 hover:bg-red-100 hover:text-red-600 rounded-full transition-colors text-gray-400" title="Delete Idea">
+                <Trash2 size={20} />
+              </button>
+              <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500" title="Close">
+                <X size={24} />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -166,11 +173,11 @@ const IdeaDetailsModal: React.FC<IdeaDetailsModalProps> = ({ idea, performance, 
                     <div className="space-y-4">
                         <div className="flex justify-between items-center">
                             <span className="text-sm text-gray-500">Entry Price</span>
-                            <span className="font-semibold text-gray-900">${idea.entryPrice.toFixed(2)}</span>
+                            <span className="font-semibold text-gray-900">${(idea.entryPrice || 0).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between items-center">
                             <span className="text-sm text-gray-500">{status === 'Closed' ? 'Exit Price' : 'Current Price'}</span>
-                            <span className="font-semibold text-gray-900">${currentOrExitPrice.toFixed(2)}</span>
+                            <span className="font-semibold text-gray-900">${(currentOrExitPrice || 0).toFixed(2)}</span>
                         </div>
                         
                         {(idea.priceTarget || idea.stopLoss) && <div className="h-px bg-gray-100 my-2" />}
@@ -178,13 +185,13 @@ const IdeaDetailsModal: React.FC<IdeaDetailsModalProps> = ({ idea, performance, 
                         {idea.priceTarget && (
                             <div className="flex justify-between items-center text-emerald-700">
                                 <span className="text-sm flex items-center gap-1"><Target size={14}/> Target</span>
-                                <span className="font-semibold">${idea.priceTarget.toFixed(2)}</span>
+                                <span className="font-semibold">${(idea.priceTarget || 0).toFixed(2)}</span>
                             </div>
                         )}
                         {idea.stopLoss && (
                             <div className="flex justify-between items-center text-rose-700">
                                 <span className="text-sm flex items-center gap-1"><ShieldAlert size={14}/> Stop Loss</span>
-                                <span className="font-semibold">${idea.stopLoss.toFixed(2)}</span>
+                                <span className="font-semibold">${(idea.stopLoss || 0).toFixed(2)}</span>
                             </div>
                         )}
                     </div>
@@ -208,7 +215,7 @@ const IdeaDetailsModal: React.FC<IdeaDetailsModalProps> = ({ idea, performance, 
                     <div>
                         <span className="text-xs text-gray-500 block mb-1">Tags</span>
                         <div className="flex flex-wrap gap-1">
-                            {idea.tags.map(tag => (
+                            {(idea.tags || []).map(tag => (
                                 <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-md">{tag}</span>
                             ))}
                         </div>
@@ -219,6 +226,35 @@ const IdeaDetailsModal: React.FC<IdeaDetailsModalProps> = ({ idea, performance, 
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Delete Idea</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to permanently delete this idea for <strong>{idea.ticker}</strong>? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 font-medium rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  onDeleteIdea(idea.id);
+                  setShowDeleteConfirm(false);
+                }}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

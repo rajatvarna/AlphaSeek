@@ -109,6 +109,11 @@ export default function App() {
         status: newIdeaPart.status || 'Active'
     };
     
+    if (newIdea.status === 'Closed') {
+        newIdea.exitPrice = currentPrice;
+        newIdea.exitDate = new Date().toISOString().split('T')[0];
+    }
+    
     // Update cache for new ticker
     const history = await getStockHistory(newIdea.ticker);
     setHistoryCache(prev => ({
@@ -134,20 +139,19 @@ export default function App() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = (event) => {
       try {
-        const importedIdeas = JSON.parse(e.target?.result as string);
+        const importedIdeas = JSON.parse(event.target?.result as string);
         if (Array.isArray(importedIdeas)) {
           setIdeas(importedIdeas);
         }
       } catch (error) {
         console.error("Error parsing imported JSON:", error);
-        alert("Invalid JSON file.");
       }
     };
     reader.readAsText(file);
     // Reset input
-    event.target.value = '';
+    e.target.value = '';
   };
 
   const handleUpdateIdea = (updatedIdea: StockIdea) => {
@@ -157,37 +161,47 @@ export default function App() {
     }
   };
 
+  const handleDeleteIdea = (id: string) => {
+    setIdeas(prev => prev.filter(idea => idea.id !== id));
+    setIsDetailsModalOpen(false);
+    setSelectedIdea(null);
+  };
+
   const allTags = useMemo(() => {
     const tags = new Set<string>();
-    ideas.forEach(idea => idea.tags.forEach(tag => tags.add(tag)));
+    ideas.forEach(idea => (idea.tags || []).forEach(tag => tags.add(tag)));
     return Array.from(tags).sort();
   }, [ideas]);
 
   const filteredIdeas = useMemo(() => {
     const filtered = ideas.filter(idea => {
       const matchesSearch = 
-        idea.ticker.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        idea.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        idea.summary.toLowerCase().includes(searchTerm.toLowerCase());
+        (idea.ticker || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (idea.companyName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (idea.summary || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (idea.thesis || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (idea.source || '').toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesFilter = filterSource === 'All' || idea.sourceType === filterSource;
       
-      const matchesTags = selectedTags.length === 0 || selectedTags.some(tag => idea.tags.includes(tag));
+      const matchesTags = selectedTags.length === 0 || selectedTags.some(tag => (idea.tags || []).includes(tag));
       
       return matchesSearch && matchesFilter && matchesTags;
     });
 
     return [...filtered].sort((a, b) => {
       if (sortBy === 'conviction') {
-        const priority = { 'High': 3, 'Medium': 2, 'Low': 1 };
-        return priority[b.conviction] - priority[a.conviction];
+        const priority: Record<string, number> = { 'High': 3, 'Medium': 2, 'Low': 1 };
+        return (priority[b.conviction || 'Low'] || 0) - (priority[a.conviction || 'Low'] || 0);
       }
       if (sortBy === 'entryDate') {
-        return new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime();
+        return new Date(b.entryDate || 0).getTime() - new Date(a.entryDate || 0).getTime();
       }
       if (sortBy === 'return') {
-        const returnA = ((a.currentPrice - a.entryPrice) / a.entryPrice);
-        const returnB = ((b.currentPrice - b.entryPrice) / b.entryPrice);
+        const entryA = a.entryPrice || 1;
+        const entryB = b.entryPrice || 1;
+        const returnA = (((a.currentPrice || 0) - entryA) / entryA);
+        const returnB = (((b.currentPrice || 0) - entryB) / entryB);
         return returnB - returnA;
       }
       return 0;
@@ -259,7 +273,7 @@ export default function App() {
                             {(() => {
                                 const active = ideas.filter(i => i.status === 'Active' || !i.status);
                                 if (active.length === 0) return '0%';
-                                const winners = active.filter(i => i.currentPrice > i.entryPrice).length;
+                                const winners = active.filter(i => (i.currentPrice || 0) > (i.entryPrice || 0)).length;
                                 return Math.round((winners / active.length) * 100) + '%';
                             })()}
                         </p>
@@ -270,7 +284,10 @@ export default function App() {
                             {(() => {
                                 const active = ideas.filter(i => i.status === 'Active' || !i.status);
                                 if (active.length === 0) return '0.00%';
-                                const totalReturn = active.reduce((sum, i) => sum + ((i.currentPrice - i.entryPrice) / i.entryPrice), 0);
+                                const totalReturn = active.reduce((sum, i) => {
+                                    const entry = i.entryPrice || 1; // Prevent division by zero
+                                    return sum + (((i.currentPrice || 0) - entry) / entry);
+                                }, 0);
                                 const avg = (totalReturn / active.length) * 100;
                                 return (avg > 0 ? '+' : '') + avg.toFixed(2) + '%';
                             })()}
@@ -395,6 +412,7 @@ export default function App() {
                 selectedIdea.entryDate
             ) : null}
             onUpdateIdea={handleUpdateIdea}
+            onDeleteIdea={handleDeleteIdea}
         />
     </div>
   );

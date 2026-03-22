@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StockIdea, PerformanceMetrics } from '../types';
 import { TrendingUp, TrendingDown, ExternalLink, BrainCircuit, Share2, Info, Target, ShieldAlert } from 'lucide-react';
 
@@ -61,6 +61,8 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
     }
   };
 
+  const [copied, setCopied] = useState(false);
+
   const handleShare = async () => {
     const shareData: ShareData = {
         title: `AlphaSeek Idea: ${idea.ticker}`,
@@ -77,7 +79,8 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
         } else {
             const textToCopy = `${shareData.text}${shareData.url ? `\nLink: ${shareData.url}` : ''}`;
             await navigator.clipboard.writeText(textToCopy);
-            alert('Idea summary copied to clipboard!');
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
         }
     } catch (error) {
         console.error('Error sharing:', error);
@@ -106,17 +109,22 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
         <div className="flex items-start gap-2 sm:gap-3 shrink-0">
             <div className="text-right">
               <div className={`text-2xl font-bold ${isProfitable ? 'text-green-600' : 'text-red-600'}`}>
-                {isProfitable ? '+' : ''}{performance.Total.toFixed(2)}%
+                {isProfitable ? '+' : ''}{(performance.Total || 0).toFixed(2)}%
               </div>
               <p className="text-xs text-gray-400">Total Return</p>
             </div>
             <button 
                 onClick={(e) => { e.stopPropagation(); handleShare(); }}
-                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors relative"
                 title="Share Idea"
                 aria-label="Share Idea"
             >
                 <Share2 size={18} />
+                {copied && (
+                    <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-2 py-1 rounded shadow-sm whitespace-nowrap">
+                        Copied!
+                    </span>
+                )}
             </button>
         </div>
       </div>
@@ -128,13 +136,13 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
         <div className="flex justify-between items-center text-sm text-gray-600 bg-gray-50 p-2.5 sm:p-3 rounded-lg">
           <div className="flex flex-col min-w-0">
              <span className="text-[10px] sm:text-xs text-gray-400">Entry</span>
-             <span className="font-semibold text-gray-800 text-xs sm:text-sm truncate">${idea.entryPrice.toFixed(2)}</span>
+             <span className="font-semibold text-gray-800 text-xs sm:text-sm truncate">${(idea.entryPrice || 0).toFixed(2)}</span>
              <span className="text-[9px] sm:text-[10px] text-gray-400 truncate">{idea.entryDate}</span>
           </div>
           <div className="h-8 w-px bg-gray-200 mx-2 shrink-0"></div>
            <div className="flex flex-col text-right min-w-0">
              <span className="text-[10px] sm:text-xs text-gray-400">{status === 'Closed' ? 'Exit' : 'Current'}</span>
-             <span className="font-semibold text-gray-800 text-xs sm:text-sm truncate">${currentOrExitPrice.toFixed(2)}</span>
+             <span className="font-semibold text-gray-800 text-xs sm:text-sm truncate">${(currentOrExitPrice || 0).toFixed(2)}</span>
              <span className={`text-[9px] sm:text-[10px] font-medium truncate ${status === 'Closed' ? 'text-gray-500' : 'text-green-600'}`}>
                 {status === 'Closed' ? idea.exitDate || 'Closed' : 'Live'}
              </span>
@@ -147,13 +155,13 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
                 {idea.priceTarget && (
                     <div className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md min-w-0">
                         <Target size={14} className="shrink-0" />
-                        <span className="truncate">Target: ${idea.priceTarget.toFixed(2)}</span>
+                        <span className="truncate">Target: ${(idea.priceTarget || 0).toFixed(2)}</span>
                     </div>
                 )}
                 {idea.stopLoss && (
                     <div className="flex items-center gap-1.5 text-rose-700 bg-rose-50 px-2 py-1 rounded-md min-w-0">
                         <ShieldAlert size={14} className="shrink-0" />
-                        <span className="truncate">Stop: ${idea.stopLoss.toFixed(2)}</span>
+                        <span className="truncate">Stop: ${(idea.stopLoss || 0).toFixed(2)}</span>
                     </div>
                 )}
             </div>
