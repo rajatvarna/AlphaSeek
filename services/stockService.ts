@@ -215,7 +215,8 @@ export const calculatePerformance = (
   entryPrice: number, 
   currentPrice: number, 
   history: HistoricalDataPoint[], 
-  entryDate: string
+  entryDate: string,
+  status: 'Active' | 'Closed' | 'Watchlist' = 'Active'
 ): PerformanceMetrics => {
   
   const pct = (start: number, end: number) => {
@@ -225,23 +226,26 @@ export const calculatePerformance = (
 
   const totalReturn = pct(entryPrice, currentPrice);
 
-  if (!history || history.length === 0) {
+  if (!history || history.length === 0 || status === 'Closed') {
       return { '1W': 0, '1M': 0, '6M': 0, 'YTD': 0, '1Y': 0, 'Total': totalReturn };
   }
 
   const getPriceAtAgo = (daysAgo: number): number => {
       const targetDate = new Date(Date.now() - (daysAgo * ONE_DAY_MS)).toISOString().split('T')[0];
+      const effectiveTargetDate = targetDate < entryDate ? entryDate : targetDate;
+      
       for (let i = history.length - 1; i >= 0; i--) {
-          if (history[i].date <= targetDate) {
+          if (history[i].date <= effectiveTargetDate) {
               return history[i].price;
           }
       }
-      return history[0].price;
+      return entryPrice;
   };
   
   const ytdDate = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
-  const ytdPricePoint = history.find(p => p.date >= ytdDate);
-  const ytdPrice = ytdPricePoint?.price ?? history[0].price;
+  const effectiveYtdDate = ytdDate < entryDate ? entryDate : ytdDate;
+  const ytdPricePoint = history.find(p => p.date >= effectiveYtdDate);
+  const ytdPrice = ytdPricePoint?.price ?? entryPrice;
 
   return {
     '1W': pct(getPriceAtAgo(7), currentPrice),

@@ -5,7 +5,7 @@ import IdeaCard from './components/IdeaCard';
 import AddIdeaModal from './components/AddIdeaModal';
 import IdeaDetailsModal from './components/IdeaDetailsModal';
 import TagFilter from './components/TagFilter';
-import { Plus, Search, Filter, Rocket, ArrowUpDown, Download, Upload } from 'lucide-react';
+import { Plus, Search, Filter, Rocket, ArrowUpDown, Download, Upload, Moon, Sun } from 'lucide-react';
 
 type SortOption = 'conviction' | 'entryDate' | 'return';
 
@@ -64,6 +64,23 @@ export default function App() {
   
   // Cache for historical data to avoid re-generating on every render
   const [historyCache, setHistoryCache] = useState<Record<string, any[]>>({});
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theme') === 'dark' || 
+        (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
 
   // Save to local storage whenever ideas change
   useEffect(() => {
@@ -209,18 +226,25 @@ export default function App() {
   }, [ideas, searchTerm, filterSource, selectedTags, sortBy]);
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
+    <div className="min-h-screen bg-gray-50/50 dark:bg-gray-900 transition-colors duration-200">
         {/* Navigation / Header */}
-        <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-200">
+        <header className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 transition-colors duration-200">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center h-16">
                     <div className="flex items-center gap-2">
                         <div className="bg-blue-600 p-1.5 rounded-lg text-white">
                             <Rocket size={20} />
                         </div>
-                        <h1 className="text-xl font-bold text-gray-900 tracking-tight">AlphaSeek</h1>
+                        <h1 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">AlphaSeek</h1>
                     </div>
                     <div className="flex items-center gap-4">
+                        <button 
+                            onClick={() => setIsDarkMode(!isDarkMode)}
+                            className="p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 rounded-full transition-colors"
+                            title="Toggle Dark Mode"
+                        >
+                            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+                        </button>
                         <input 
                             type="file" 
                             accept=".json" 
@@ -230,21 +254,21 @@ export default function App() {
                         />
                         <label 
                             htmlFor="import-upload"
-                            className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors shadow-sm cursor-pointer"
+                            className="inline-flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-colors shadow-sm cursor-pointer"
                         >
                             <Upload size={16} />
                             <span className="hidden sm:inline">Import</span>
                         </label>
                         <button 
                             onClick={handleExport}
-                            className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors shadow-sm"
+                            className="inline-flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-colors shadow-sm"
                         >
                             <Download size={16} />
                             <span className="hidden sm:inline">Export</span>
                         </button>
                         <button 
                             onClick={() => setIsModalOpen(true)}
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 dark:bg-blue-600 hover:bg-gray-800 dark:hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
                         >
                             <Plus size={16} />
                             Add Idea
@@ -255,21 +279,21 @@ export default function App() {
         </header>
 
         {/* Filters Bar */}
-        <div className="border-b border-gray-200 bg-white">
+        <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 transition-colors duration-200">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                 {/* Dashboard Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">Total Ideas</p>
-                        <p className="text-2xl font-bold text-gray-900">{ideas.length}</p>
+                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-1">Total Ideas</p>
+                        <p className="text-2xl font-bold text-gray-900 dark:text-white">{ideas.length}</p>
                     </div>
-                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">Active Ideas</p>
-                        <p className="text-2xl font-bold text-gray-900">{ideas.filter(i => i.status === 'Active' || !i.status).length}</p>
+                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-1">Active Ideas</p>
+                        <p className="text-2xl font-bold text-gray-900 dark:text-white">{ideas.filter(i => i.status === 'Active' || !i.status).length}</p>
                     </div>
-                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">Win Rate (Active)</p>
-                        <p className="text-2xl font-bold text-gray-900">
+                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-1">Win Rate (Active)</p>
+                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
                             {(() => {
                                 const active = ideas.filter(i => i.status === 'Active' || !i.status);
                                 if (active.length === 0) return '0%';
@@ -278,9 +302,9 @@ export default function App() {
                             })()}
                         </p>
                     </div>
-                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">Avg Return (Active)</p>
-                        <p className="text-2xl font-bold text-gray-900">
+                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-1">Avg Return (Active)</p>
+                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
                             {(() => {
                                 const active = ideas.filter(i => i.status === 'Active' || !i.status);
                                 if (active.length === 0) return '0.00%';
@@ -299,12 +323,12 @@ export default function App() {
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto items-center">
                         <div className="relative w-full sm:w-80">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <Search size={18} className="text-gray-400" />
+                                <Search size={18} className="text-gray-400 dark:text-gray-500" />
                             </div>
                             <input
                                 type="text"
                                 placeholder="Search ticker, thesis, or source..."
-                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition duration-150 ease-in-out"
+                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg leading-5 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition duration-150 ease-in-out"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
@@ -314,12 +338,12 @@ export default function App() {
                             selectedTags={selectedTags} 
                             onChange={setSelectedTags} 
                         />
-                        <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2 bg-white shadow-sm focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-500 transition-all w-full sm:w-auto">
-                            <ArrowUpDown size={16} className="text-gray-400" />
+                        <div className="flex items-center gap-2 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 shadow-sm focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-500 transition-all w-full sm:w-auto">
+                            <ArrowUpDown size={16} className="text-gray-400 dark:text-gray-500" />
                             <select 
                                 value={sortBy}
                                 onChange={(e) => setSortBy(e.target.value as SortOption)}
-                                className="text-sm font-medium text-gray-700 bg-transparent border-none focus:ring-0 cursor-pointer p-0 pr-6"
+                                className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-transparent border-none focus:ring-0 cursor-pointer p-0 pr-6"
                             >
                                 <option value="entryDate">Newest First</option>
                                 <option value="conviction">Highest Conviction</option>
@@ -329,15 +353,15 @@ export default function App() {
                     </div>
                     
                     <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 scrollbar-hide">
-                        <Filter size={16} className="text-gray-400 mr-1 flex-shrink-0" />
+                        <Filter size={16} className="text-gray-400 dark:text-gray-500 mr-1 flex-shrink-0" />
                         {(['All', 'Hedge Fund', 'X', 'Reddit', 'Blog', 'News', 'Other'] as const).map((type) => (
                             <button
                                 key={type}
                                 onClick={() => setFilterSource(type)}
                                 className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border ${
                                     filterSource === type 
-                                    ? 'bg-blue-50 text-blue-700 border-blue-200' 
-                                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800' 
+                                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
                                 }`}
                             >
                                 {type}
@@ -359,7 +383,8 @@ export default function App() {
                             idea.entryPrice, 
                             currentOrExitPrice, 
                             history, 
-                            idea.entryDate
+                            idea.entryDate,
+                            idea.status
                         );
 
                         return (
@@ -374,6 +399,7 @@ export default function App() {
                                 <IdeaCard 
                                     idea={idea} 
                                     performance={performance}
+                                    isDarkMode={isDarkMode}
                                 />
                             </div>
                         );
@@ -381,11 +407,11 @@ export default function App() {
                 </div>
             ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
-                    <div className="bg-gray-100 p-4 rounded-full mb-4">
-                        <Search size={32} className="text-gray-400" />
+                    <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-full mb-4">
+                        <Search size={32} className="text-gray-400 dark:text-gray-500" />
                     </div>
-                    <h3 className="text-lg font-medium text-gray-900">No ideas found</h3>
-                    <p className="text-gray-500 mt-1 max-w-sm">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">No ideas found</h3>
+                    <p className="text-gray-500 dark:text-gray-400 mt-1 max-w-sm">
                         Try adjusting your search terms, filters or tags.
                     </p>
                 </div>
@@ -396,6 +422,7 @@ export default function App() {
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
             onAdd={handleAddIdea}
+            isDarkMode={isDarkMode}
         />
 
         <IdeaDetailsModal
@@ -409,10 +436,12 @@ export default function App() {
                 selectedIdea.entryPrice,
                 selectedIdea.status === 'Closed' && selectedIdea.exitPrice ? selectedIdea.exitPrice : selectedIdea.currentPrice,
                 historyCache[selectedIdea.ticker] || [],
-                selectedIdea.entryDate
+                selectedIdea.entryDate,
+                selectedIdea.status
             ) : null}
             onUpdateIdea={handleUpdateIdea}
             onDeleteIdea={handleDeleteIdea}
+            isDarkMode={isDarkMode}
         />
     </div>
   );

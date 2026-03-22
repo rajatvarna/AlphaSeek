@@ -5,6 +5,58 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import AdvancedTradingViewWidget from './AdvancedTradingViewWidget';
 
+const TradingViewProfileWidget = ({ ticker, isDarkMode }: { ticker: string, isDarkMode?: boolean }) => {
+  const config = {
+    colorTheme: isDarkMode ? "dark" : "light",
+    isTransparent: true,
+    width: "100%",
+    height: "100%",
+    symbol: ticker,
+    locale: "en"
+  };
+  const src = `https://s.tradingview.com/embed-widget/symbol-profile/?locale=en#${encodeURIComponent(JSON.stringify(config))}`;
+  return (
+    <div className="w-full h-[250px] tradingview-widget-container">
+      <iframe src={src} width="100%" height="100%" style={{ border: 0 }} scrolling="no" />
+    </div>
+  );
+};
+
+const TradingViewSymbolInfoWidget = ({ ticker, isDarkMode }: { ticker: string, isDarkMode?: boolean }) => {
+  const config = {
+    symbol: ticker,
+    width: "100%",
+    locale: "en",
+    colorTheme: isDarkMode ? "dark" : "light",
+    isTransparent: true
+  };
+  const src = `https://s.tradingview.com/embed-widget/symbol-info/?locale=en#${encodeURIComponent(JSON.stringify(config))}`;
+  return (
+    <div className="w-full h-[100px] tradingview-widget-container">
+      <iframe src={src} width="100%" height="100%" style={{ border: 0 }} scrolling="no" />
+    </div>
+  );
+};
+
+const TradingViewFinancialsWidget = ({ ticker, isDarkMode }: { ticker: string, isDarkMode?: boolean }) => {
+  const config = {
+    colorTheme: isDarkMode ? "dark" : "light",
+    isTransparent: true,
+    largeChartUrl: "",
+    displayMode: "regular",
+    width: "100%",
+    height: "100%",
+    symbol: ticker,
+    locale: "en"
+  };
+  const src = `https://s.tradingview.com/embed-widget/financials/?locale=en#${encodeURIComponent(JSON.stringify(config))}`;
+  return (
+    <div className="w-full h-[400px] tradingview-widget-container">
+      <iframe src={src} width="100%" height="100%" style={{ border: 0 }} scrolling="no" />
+    </div>
+  );
+};
+
 interface IdeaDetailsModalProps {
   idea: StockIdea | null;
   performance: PerformanceMetrics | null;
@@ -12,9 +64,10 @@ interface IdeaDetailsModalProps {
   onClose: () => void;
   onUpdateIdea: (updatedIdea: StockIdea) => void;
   onDeleteIdea: (id: string) => void;
+  isDarkMode?: boolean;
 }
 
-const IdeaDetailsModal: React.FC<IdeaDetailsModalProps> = ({ idea, performance, isOpen, onClose, onUpdateIdea, onDeleteIdea }) => {
+const IdeaDetailsModal: React.FC<IdeaDetailsModalProps> = ({ idea, performance, isOpen, onClose, onUpdateIdea, onDeleteIdea, isDarkMode }) => {
   const [newNote, setNewNote] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -101,9 +154,14 @@ const IdeaDetailsModal: React.FC<IdeaDetailsModalProps> = ({ idea, performance, 
         {/* Scrollable Content */}
         <div className="flex-grow overflow-y-auto p-6 bg-gray-50/50">
           
+          {/* Symbol Info Widget */}
+          <div className="mb-6 -mx-2">
+            <TradingViewSymbolInfoWidget ticker={idea.ticker} isDarkMode={isDarkMode} />
+          </div>
+
           {/* Advanced Chart Section */}
-          <div className="mb-8 bg-white p-2 rounded-xl shadow-sm border border-gray-100 h-[500px]">
-            <AdvancedTradingViewWidget ticker={idea.ticker} />
+          <div className="mb-8 bg-white dark:bg-gray-800 p-2 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 h-[500px]">
+            <AdvancedTradingViewWidget ticker={idea.ticker} isDarkMode={isDarkMode} />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -195,6 +253,18 @@ const IdeaDetailsModal: React.FC<IdeaDetailsModalProps> = ({ idea, performance, 
                             </div>
                         )}
                     </div>
+                </div>
+
+                {/* Company Profile */}
+                <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2 border-b border-gray-100 dark:border-gray-700 pb-2">Company Profile</h3>
+                    <TradingViewProfileWidget ticker={idea.ticker} isDarkMode={isDarkMode} />
+                </div>
+
+                {/* Financials */}
+                <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2 border-b border-gray-100 dark:border-gray-700 pb-2">Financials</h3>
+                    <TradingViewFinancialsWidget ticker={idea.ticker} isDarkMode={isDarkMode} />
                 </div>
 
                 {/* Metadata */}
