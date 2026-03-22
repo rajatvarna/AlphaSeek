@@ -3,6 +3,7 @@ import { StockIdea, PerformanceMetrics, IdeaNote } from '../types';
 import { X, ExternalLink, TrendingUp, TrendingDown, Target, ShieldAlert, Plus, MessageSquare } from 'lucide-react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import AdvancedTradingViewWidget from './AdvancedTradingViewWidget';
 
 interface IdeaDetailsModalProps {
   idea: StockIdea | null;
@@ -55,7 +56,7 @@ const IdeaDetailsModal: React.FC<IdeaDetailsModalProps> = ({ idea, performance, 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden">
         
         {/* Header */}
         <div className="p-6 border-b border-gray-100 flex justify-between items-start bg-gradient-to-r from-gray-50 to-white shrink-0">
@@ -92,6 +93,12 @@ const IdeaDetailsModal: React.FC<IdeaDetailsModalProps> = ({ idea, performance, 
 
         {/* Scrollable Content */}
         <div className="flex-grow overflow-y-auto p-6 bg-gray-50/50">
+          
+          {/* Advanced Chart Section */}
+          <div className="mb-8 bg-white p-2 rounded-xl shadow-sm border border-gray-100 h-[500px]">
+            <AdvancedTradingViewWidget ticker={idea.ticker} />
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
             {/* Left Column: Thesis & Notes */}

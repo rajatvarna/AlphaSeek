@@ -10,11 +10,11 @@ interface IdeaCardProps {
 const PerformanceBadge = ({ label, value }: { label: string, value: number }) => {
   const isPositive = value >= 0;
   return (
-    <div className={`flex flex-col items-center p-2 rounded-lg ${isPositive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'} border ${isPositive ? 'border-green-100' : 'border-red-100'} min-w-[60px]`}>
+    <div className={`flex flex-col items-center p-1.5 sm:p-2 rounded-lg ${isPositive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'} border ${isPositive ? 'border-green-100' : 'border-red-100'} min-w-0 w-full`}>
       <span className="text-[10px] font-semibold opacity-70 uppercase tracking-wider">{label}</span>
-      <span className="text-sm font-bold flex items-center gap-0.5">
-        {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-        {Math.abs(value).toFixed(1)}%
+      <span className="text-xs sm:text-sm font-bold flex items-center gap-0.5 truncate max-w-full">
+        {isPositive ? <TrendingUp size={12} className="shrink-0" /> : <TrendingDown size={12} className="shrink-0" />}
+        <span className="truncate">{Math.abs(value).toFixed(1)}%</span>
       </span>
     </div>
   );
@@ -87,21 +87,23 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200 overflow-hidden flex flex-col h-full">
       {/* Header */}
-      <div className="p-5 border-b border-gray-50 flex justify-between items-start bg-gradient-to-r from-gray-50 to-white shrink-0">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-xl font-bold text-gray-900 tracking-tight">{idea.ticker}</h3>
-            <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${getStatusColor()}`}>{status}</span>
-            <span className="px-2 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full font-medium">{idea.sourceType}</span>
+      <div className="p-4 sm:p-5 border-b border-gray-50 flex justify-between items-start bg-gradient-to-r from-gray-50 to-white shrink-0 gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center flex-wrap gap-1.5 sm:gap-2">
+            <div className="flex items-baseline flex-wrap gap-1.5 sm:gap-2 min-w-0 max-w-full">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900 tracking-tight shrink-0">{idea.ticker}</h3>
+              <span className="text-xs sm:text-sm text-gray-500 font-medium break-words">{idea.companyName}</span>
+            </div>
+            <span className={`px-2 py-0.5 text-[10px] sm:text-xs rounded-full font-medium whitespace-nowrap ${getStatusColor()}`}>{status}</span>
+            <span className="px-2 py-0.5 bg-gray-200 text-gray-700 text-[10px] sm:text-xs rounded-full font-medium whitespace-nowrap">{idea.sourceType}</span>
             {idea.conviction === 'High' && (
-                <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full font-medium flex items-center gap-1">
+                <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-[10px] sm:text-xs rounded-full font-medium flex items-center gap-1 whitespace-nowrap">
                     <BrainCircuit size={10} /> High Conviction
                 </span>
             )}
           </div>
-          <p className="text-sm text-gray-500 font-medium truncate max-w-[200px]">{idea.companyName}</p>
         </div>
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-2 sm:gap-3 shrink-0">
             <div className="text-right">
               <div className={`text-2xl font-bold ${isProfitable ? 'text-green-600' : 'text-red-600'}`}>
                 {isProfitable ? '+' : ''}{performance.Total.toFixed(2)}%
@@ -120,20 +122,20 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
       </div>
 
       {/* Content */}
-      <div className="p-5 flex-grow space-y-4 flex flex-col">
+      <div className="p-4 sm:p-5 flex-grow space-y-4 flex flex-col min-w-0">
         
         {/* Price Info */}
-        <div className="flex justify-between items-center text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
-          <div className="flex flex-col">
-             <span className="text-xs text-gray-400">Entry</span>
-             <span className="font-semibold text-gray-800">${idea.entryPrice.toFixed(2)}</span>
-             <span className="text-[10px] text-gray-400">{idea.entryDate}</span>
+        <div className="flex justify-between items-center text-sm text-gray-600 bg-gray-50 p-2.5 sm:p-3 rounded-lg">
+          <div className="flex flex-col min-w-0">
+             <span className="text-[10px] sm:text-xs text-gray-400">Entry</span>
+             <span className="font-semibold text-gray-800 text-xs sm:text-sm truncate">${idea.entryPrice.toFixed(2)}</span>
+             <span className="text-[9px] sm:text-[10px] text-gray-400 truncate">{idea.entryDate}</span>
           </div>
-          <div className="h-8 w-px bg-gray-200 mx-2"></div>
-           <div className="flex flex-col text-right">
-             <span className="text-xs text-gray-400">{status === 'Closed' ? 'Exit' : 'Current'}</span>
-             <span className="font-semibold text-gray-800">${currentOrExitPrice.toFixed(2)}</span>
-             <span className={`text-[10px] font-medium ${status === 'Closed' ? 'text-gray-500' : 'text-green-600'}`}>
+          <div className="h-8 w-px bg-gray-200 mx-2 shrink-0"></div>
+           <div className="flex flex-col text-right min-w-0">
+             <span className="text-[10px] sm:text-xs text-gray-400">{status === 'Closed' ? 'Exit' : 'Current'}</span>
+             <span className="font-semibold text-gray-800 text-xs sm:text-sm truncate">${currentOrExitPrice.toFixed(2)}</span>
+             <span className={`text-[9px] sm:text-[10px] font-medium truncate ${status === 'Closed' ? 'text-gray-500' : 'text-green-600'}`}>
                 {status === 'Closed' ? idea.exitDate || 'Closed' : 'Live'}
              </span>
           </div>
@@ -141,17 +143,17 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
 
         {/* Targets */}
         {(idea.priceTarget || idea.stopLoss) && (
-            <div className="flex gap-4 text-xs font-medium border-t border-gray-100 pt-3">
+            <div className="flex flex-wrap gap-2 sm:gap-4 text-xs font-medium border-t border-gray-100 pt-3">
                 {idea.priceTarget && (
-                    <div className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md">
-                        <Target size={14} />
-                        <span>Target: ${idea.priceTarget.toFixed(2)}</span>
+                    <div className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md min-w-0">
+                        <Target size={14} className="shrink-0" />
+                        <span className="truncate">Target: ${idea.priceTarget.toFixed(2)}</span>
                     </div>
                 )}
                 {idea.stopLoss && (
-                    <div className="flex items-center gap-1.5 text-rose-700 bg-rose-50 px-2 py-1 rounded-md">
-                        <ShieldAlert size={14} />
-                        <span>Stop: ${idea.stopLoss.toFixed(2)}</span>
+                    <div className="flex items-center gap-1.5 text-rose-700 bg-rose-50 px-2 py-1 rounded-md min-w-0">
+                        <ShieldAlert size={14} className="shrink-0" />
+                        <span className="truncate">Stop: ${idea.stopLoss.toFixed(2)}</span>
                     </div>
                 )}
             </div>
@@ -192,9 +194,9 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center shrink-0">
-         <span className="text-xs text-gray-400 flex items-center gap-1">
-            Source: <span className="font-medium text-gray-600 truncate max-w-[100px]">{idea.source}</span>
+      <div className="p-3 sm:p-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center shrink-0 gap-2">
+         <span className="text-[10px] sm:text-xs text-gray-400 flex items-center gap-1 min-w-0">
+            Source: <span className="font-medium text-gray-600 truncate">{idea.source}</span>
          </span>
          {idea.originalLink && (
             <a 
@@ -202,7 +204,7 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance }) => {
                 target="_blank" 
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="text-blue-600 hover:text-blue-800 text-xs font-medium flex items-center gap-1 transition-colors"
+                className="text-blue-600 hover:text-blue-800 text-[10px] sm:text-xs font-medium flex items-center gap-1 transition-colors whitespace-nowrap shrink-0"
             >
                 Original Link <ExternalLink size={12} />
             </a>
