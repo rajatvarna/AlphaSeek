@@ -14,7 +14,7 @@ const TradingViewProfileWidget = ({ ticker, isDarkMode }: { ticker: string, isDa
     symbol: ticker,
     locale: "en"
   };
-  const src = `https://s.tradingview.com/embed-widget/symbol-profile/?locale=en#${encodeURIComponent(JSON.stringify(config))}`;
+  const src = `https://s.tradingview.com/embed-widget/symbol-profile/?locale=en&symbol=${encodeURIComponent(ticker)}#${encodeURIComponent(JSON.stringify(config))}`;
   return (
     <div className="w-full h-[250px] tradingview-widget-container">
       <iframe src={src} width="100%" height="100%" style={{ border: 0 }} scrolling="no" />
@@ -30,7 +30,7 @@ const TradingViewSymbolInfoWidget = ({ ticker, isDarkMode }: { ticker: string, i
     colorTheme: isDarkMode ? "dark" : "light",
     isTransparent: true
   };
-  const src = `https://s.tradingview.com/embed-widget/symbol-info/?locale=en#${encodeURIComponent(JSON.stringify(config))}`;
+  const src = `https://s.tradingview.com/embed-widget/symbol-info/?locale=en&symbol=${encodeURIComponent(ticker)}#${encodeURIComponent(JSON.stringify(config))}`;
   return (
     <div className="w-full h-[100px] tradingview-widget-container">
       <iframe src={src} width="100%" height="100%" style={{ border: 0 }} scrolling="no" />

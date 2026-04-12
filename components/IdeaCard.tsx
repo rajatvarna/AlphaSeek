@@ -1,25 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StockIdea, PerformanceMetrics } from '../types';
-import { TrendingUp, TrendingDown, ExternalLink, BrainCircuit, Share2, Info, Target, ShieldAlert } from 'lucide-react';
+import { ExternalLink, BrainCircuit, Share2, Info, Target, ShieldAlert } from 'lucide-react';
 
 interface IdeaCardProps {
   idea: StockIdea;
   performance: PerformanceMetrics;
   isDarkMode?: boolean;
 }
-
-const PerformanceBadge = ({ label, value, isDarkMode }: { label: string, value: number, isDarkMode?: boolean }) => {
-  const isPositive = value >= 0;
-  return (
-    <div className={`flex flex-col items-center p-1.5 sm:p-2 rounded-lg ${isPositive ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400'} border ${isPositive ? 'border-green-100 dark:border-green-800' : 'border-red-100 dark:border-red-800'} min-w-0 w-full`}>
-      <span className="text-[10px] font-semibold opacity-70 uppercase tracking-wider">{label}</span>
-      <span className="text-xs sm:text-sm font-bold flex items-center gap-0.5 truncate max-w-full">
-        {isPositive ? <TrendingUp size={12} className="shrink-0" /> : <TrendingDown size={12} className="shrink-0" />}
-        <span className="truncate">{Math.abs(value).toFixed(1)}%</span>
-      </span>
-    </div>
-  );
-};
 
 const TradingViewWidget = ({ ticker, isDarkMode }: { ticker: string, isDarkMode?: boolean }) => {
   const config = {
@@ -82,7 +69,7 @@ const TradingViewProfileWidget = ({ ticker, isDarkMode }: { ticker: string, isDa
     symbol: ticker,
     locale: "en"
   };
-  const src = `https://s.tradingview.com/embed-widget/symbol-profile/?locale=en#${encodeURIComponent(JSON.stringify(config))}`;
+  const src = `https://s.tradingview.com/embed-widget/symbol-profile/?locale=en&symbol=${encodeURIComponent(ticker)}#${encodeURIComponent(JSON.stringify(config))}`;
   return (
     <div className="w-full h-[200px] tradingview-widget-container">
       <iframe src={src} width="100%" height="100%" style={{ border: 0 }} scrolling="no" />
@@ -228,14 +215,6 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea, performance, isDarkMode }) =>
         {/* TradingView Widget */}
         <div className="h-[300px] w-full border border-gray-100 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800 shrink-0">
             <TradingViewWidget ticker={idea.ticker} isDarkMode={isDarkMode} />
-        </div>
-
-        {/* Metrics Grid */}
-        <div className="grid grid-cols-4 gap-2 mt-auto shrink-0">
-          <PerformanceBadge label="1W" value={performance['1W']} isDarkMode={isDarkMode} />
-          <PerformanceBadge label="1M" value={performance['1M']} isDarkMode={isDarkMode} />
-          <PerformanceBadge label="6M" value={performance['6M']} isDarkMode={isDarkMode} />
-          <PerformanceBadge label="YTD" value={performance.YTD} isDarkMode={isDarkMode} />
         </div>
       </div>
 
